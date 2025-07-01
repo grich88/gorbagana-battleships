@@ -1053,22 +1053,23 @@ const BattleshipGame: React.FC = () => {
           <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent mb-4">Ready to Start Playing?</h2>
-              <p className="text-gray-600">Choose your battle mode to begin</p>
+              <p className="text-gray-600">Choose your battle mode to begin your naval conquest!</p>
             </div>
             
-            <div className="flex justify-center">
+            <div className="flex flex-col items-center space-y-4">
               <button
                 onClick={() => setShowGameModeSelector(true)}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 text-lg"
               >
-                <Anchor className="w-5 h-5" />
-                Choose Battle Mode
+                <Anchor className="w-6 h-6" />
+                🚀 START PLAYING BATTLESHIP
               </button>
+              <p className="text-sm text-gray-500">Select game mode • Deploy ships • Battle for glory!</p>
             </div>
           </div>
         )}
 
-        {/* Game setup and sharing section - ALWAYS show if no active game */}
+        {/* Enhanced Game setup and sharing section - ALWAYS show if no active game */}
         {gamePhase === 'setup' && !battleshipGame && (
           <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
             <div className="flex justify-between items-center mb-6">
@@ -1130,7 +1131,7 @@ const BattleshipGame: React.FC = () => {
                     className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <Anchor className="w-5 h-5" />
-                    Deploy Fleet
+                    🎯 Deploy Fleet
                   </button>
                 </div>
               </div>
@@ -1165,7 +1166,7 @@ const BattleshipGame: React.FC = () => {
                     className="w-full bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <Users className="w-5 h-5" />
-                    Join Battle
+                    ⚔️ Join Battle
                   </button>
                 </div>
                 
@@ -1192,7 +1193,7 @@ const BattleshipGame: React.FC = () => {
                     className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg mx-auto"
                   >
                     <Trophy className="w-5 h-5" />
-                    Browse Admiral's Harbor
+                    🏆 Browse Admiral's Harbor
                   </button>
                   <p className="text-gray-600 text-sm mt-2">Discover public battles waiting for challengers</p>
                 </div>

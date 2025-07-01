@@ -467,7 +467,7 @@ class GorbaganaBlockchainService {
 }
 
 // Test different RPC endpoints and select the best one
-export async function selectOptimalGorbaganaEndpoint(): Promise<string> {
+async function selectOptimalGorbaganaEndpoint(): Promise<string> {
   console.log('🔍 Testing RPC endpoints for optimal connection...');
   
   for (const endpoint of GORBAGANA_RPC_ENDPOINTS) {
@@ -506,10 +506,10 @@ export async function selectOptimalGorbaganaEndpoint(): Promise<string> {
 // Initialize and export singleton instance
 let gorbaganaServiceInstance: GorbaganaBlockchainService | null = null;
 
-export async function initializeGorbaganaService(): Promise<GorbaganaBlockchainService> {
+async function initializeGorbaganaService(): Promise<GorbaganaBlockchainService> {
   if (!gorbaganaServiceInstance) {
     console.log('🚀🚀🚀 BATTLESHIP v2.1 - MULTI-ENDPOINT GORBAGANA RPC LOADED');
-    console.log('�� Primary RPC: https://rpc.gorbagana.wtf/');
+    console.log('🎯 Primary RPC: https://rpc.gorbagana.wtf/');
     console.log('⚡ Secondary RPC: https://gorchain.wstf.io');
     console.log('⏰ DEPLOYMENT TIMESTAMP: 🔥 BATTLESHIP-v2.0-ENHANCED-RPC-2025-01-29 🔥');
     console.log(`🔄 CACHE BUST ID: ENHANCED-GORBAGANA-RPC-v2.0-${Date.now()}`);
@@ -536,7 +536,7 @@ export async function initializeGorbaganaService(): Promise<GorbaganaBlockchainS
 }
 
 // Export default service instance (will be initialized on first use)
-export const gorbaganaService = {
+const gorbaganaService = {
   async getInstance(): Promise<GorbaganaBlockchainService> {
     return await initializeGorbaganaService();
   }
@@ -618,4 +618,7 @@ class GorbaganaBlockchainServiceWithEscrow extends GorbaganaBlockchainService {
 
 // Update exports to use enhanced service
 export { GorbaganaBlockchainServiceWithEscrow as GorbaganaBlockchainService };
-export type { EscrowAccount, RefundResult }; 
+export type { EscrowAccount, RefundResult };
+
+// Also export the initialization function and gorbaganaService instance
+export { initializeGorbaganaService, gorbaganaService, selectOptimalGorbaganaEndpoint }; 

@@ -6,7 +6,6 @@ import { PublicKey } from '@solana/web3.js';
 // Battleship game types
 export interface BattleshipGame {
   id: string;
-  gameAccount?: string; // Anchor PDA address
   player1: string;
   player2?: string;
   player1Board: number[];
@@ -434,7 +433,6 @@ export const battleshipGameStorage = new BattleshipGameStorage()
 export function convertToBattleshipGame(gameState: any, gameId: string, player1: string): BattleshipGame {
   return {
     id: gameId,
-    gameAccount: gameState.gameAccount,
     player1: player1,
     player2: gameState.player2 || undefined,
     player1Board: gameState.player1Board || new Array(100).fill(0),
@@ -461,7 +459,6 @@ export function convertToBattleshipGame(gameState: any, gameId: string, player1:
 
 export function convertFromBattleshipGame(battleshipGame: BattleshipGame): any {
   return {
-    gameAccount: battleshipGame.gameAccount,
     player2: battleshipGame.player2,
     player1Board: battleshipGame.player1Board,
     player2Board: battleshipGame.player2Board,

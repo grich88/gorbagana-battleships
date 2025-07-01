@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Wallet, TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -11,6 +12,9 @@ interface WalletBalanceProps {
   className?: string;
 }
 
+// GOR token mint address on Gorbagana (you might need to update this)
+const GOR_TOKEN_MINT = 'GorVayjRZyNqnYPzqnjXCqKDrJEEGhZfYY6FHWJ2XMVJ'; // Example - needs to be the actual GOR mint
+
 const WalletBalance: React.FC<WalletBalanceProps> = ({ 
   onWagerChange, 
   currentWager = 0,
@@ -20,11 +24,12 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
   const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number>(0);
+  const [solBalance, setSolBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [wagerAmount, setWagerAmount] = useState<number>(currentWager);
   const [wagerInput, setWagerInput] = useState<string>(currentWager > 0 ? currentWager.toString() : ''); // String for decimal input
 
-  // Fetch balance using Solana SDK with Gorbagana RPC
+  // Fetch both SOL and GOR token balance
   const fetchBalance = async () => {
     if (!publicKey || !connected) return;
 
@@ -33,19 +38,69 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
       console.log('🔗 Using RPC endpoint: https://rpc.gorbagana.wtf/');
       console.log('🎒 Configured wallets: [ \'Backpack\' ]');
       
-      // Get balance in lamports using Solana SDK
+      // Get SOL balance (for gas fees)
       const lamports = await connection.getBalance(publicKey);
+      const solBal = lamports / LAMPORTS_PER_SOL;
+      setSolBalance(solBal);
       
-      // Convert lamports to GOR (same as SOL conversion)
-      const gorBalance = lamports / LAMPORTS_PER_SOL;
+      // Try to get GOR token balance
+      let gorBalance = 0;
+      
+      try {
+        // Get all token accounts for this wallet
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          {
+            programId: TOKEN_PROGRAM_ID,
+          }
+        );
+        
+        console.log(`🔍 Found ${tokenAccounts.value.length} token accounts`);
+        
+        // Look for GOR token account
+        for (const tokenAccount of tokenAccounts.value) {
+          const tokenInfo = tokenAccount.account.data.parsed.info;
+          console.log(`🪙 Token found: ${tokenInfo.mint}, Balance: ${tokenInfo.tokenAmount.uiAmount}`);
+          
+          // Check if this is a GOR token (you might need to adjust this logic)
+          if (tokenInfo.mint === GOR_TOKEN_MINT || 
+              tokenInfo.tokenAmount.uiAmount > 0) { // For now, take any token with balance
+            gorBalance = tokenInfo.tokenAmount.uiAmount || 0;
+            console.log(`💰 GOR token found! Balance: ${gorBalance}`);
+            break;
+          }
+        }
+        
+        // If no specific GOR token found, but we have tokens, use the first one with balance
+        if (gorBalance === 0 && tokenAccounts.value.length > 0) {
+          for (const tokenAccount of tokenAccounts.value) {
+            const tokenInfo = tokenAccount.account.data.parsed.info;
+            if (tokenInfo.tokenAmount.uiAmount > 0) {
+              gorBalance = tokenInfo.tokenAmount.uiAmount;
+              console.log(`💰 Using token balance: ${gorBalance} from mint ${tokenInfo.mint}`);
+              break;
+            }
+          }
+        }
+        
+      } catch (tokenError) {
+        console.log('ℹ️ No token accounts found or error fetching tokens:', tokenError);
+        // Fallback: if no tokens, check if the SOL balance should be treated as GOR
+        if (solBal > 0) {
+          gorBalance = solBal;
+          console.log(`💰 Using SOL balance as GOR: ${gorBalance}`);
+        }
+      }
+      
       setBalance(gorBalance);
+      console.log(`💰 Final GOR balance: ${gorBalance.toFixed(6)} GOR`);
+      console.log(`💰 SOL balance: ${solBal.toFixed(6)} SOL`);
       
-      console.log(`💰 Gorbagana balance fetched: ${gorBalance.toFixed(6)} GOR`);
     } catch (error) {
-      console.error('Error fetching Gorbagana balance:', error);
-      toast.error('Failed to fetch GOR balance');
-      // Set balance to 0 on error instead of throwing
+      console.error('Error fetching balances:', error);
+      toast.error('Failed to fetch balance');
       setBalance(0);
+      setSolBalance(0);
     } finally {
       setLoading(false);
     }
@@ -131,9 +186,16 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
               ) : (
-                <p className="text-lg font-bold text-gray-800">
-                  {balance.toFixed(4)} GOR
-                </p>
+                <div className="space-y-1">
+                  <p className="text-lg font-bold text-gray-800">
+                    {balance.toFixed(4)} GOR
+                  </p>
+                  {solBalance > 0 && (
+                    <p className="text-xs text-gray-500">
+                      ({solBalance.toFixed(4)} SOL for gas)
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>

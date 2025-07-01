@@ -1,0 +1,45 @@
+services:
+  # Backend API Service
+  - type: web
+    name: gorbagana-battleship-backend
+    runtime: node
+    plan: starter  # Free tier
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3002
+      - key: CORS_ORIGIN
+        fromService:
+          name: gorbagana-battleship-frontend
+          type: web
+          property: url
+      - key: MONGODB_URI
+        sync: false  # Set manually in Render dashboard
+    healthCheckPath: /health
+    region: oregon  # or virginia, frankfurt, singapore
+    
+  # Frontend Web Service  
+  - type: web
+    name: gorbagana-battleship-frontend
+    runtime: node
+    plan: starter  # Free tier
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: gorbagana-battleship-backend
+          type: web
+          property: url
+      - key: NEXT_PUBLIC_RPC_PRIMARY
+        value: https://rpc.gorbagana.wtf/
+      - key: NEXT_PUBLIC_RPC_SECONDARY  
+        value: https://gorchain.wstf.io
+      - key: NEXT_PUBLIC_RPC_FALLBACK
+        value: https://api.devnet.solana.com
+    region: oregon  # Same region as backend for lower latency 

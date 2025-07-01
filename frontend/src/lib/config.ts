@@ -13,11 +13,11 @@ export const BATTLESHIP_CONFIG = {
     TIMEOUT: 5000,
   },
 
-  // Gorbagana RPC Endpoints
+  // Gorbagana RPC Endpoints - Production Environment Variables
   RPC: {
-    PRIMARY: 'https://rpc.gorbagana.wtf/',
-    SECONDARY: 'https://gorchain.wstf.io',
-    FALLBACK: 'https://api.devnet.solana.com',
+    PRIMARY: process.env.NEXT_PUBLIC_RPC_PRIMARY || 'https://rpc.gorbagana.wtf/',
+    SECONDARY: process.env.NEXT_PUBLIC_RPC_SECONDARY || 'https://gorchain.wstf.io',
+    FALLBACK: process.env.NEXT_PUBLIC_RPC_FALLBACK || 'https://api.devnet.solana.com',
   },
 
   // Game Features

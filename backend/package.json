@@ -1,0 +1,59 @@
+{
+  "name": "gorbagana-battleship-backend",
+  "version": "1.0.0",
+  "description": "Backend API server for Gorbagana Battleship multiplayer game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "echo 'Backend build complete - no transpilation needed'",
+    "test": "jest",
+    "lint": "eslint .",
+    "seed": "node scripts/seed.js",
+    "prod": "NODE_ENV=production node server.js",
+    "setup-db": "node setup-database.js"
+  },
+  "keywords": [
+    "battleship",
+    "blockchain",
+    "solana",
+    "gorbagana",
+    "multiplayer",
+    "games",
+    "mongodb"
+  ],
+  "author": "Gorbagana Battleship Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.0",
+    "mongodb": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^7.1.5",
+    "joi": "^17.11.0",
+    "crypto": "^1.0.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.53.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grich88/gorbagana-battleships.git"
+  },
+  "bugs": {
+    "url": "https://github.com/grich88/gorbagana-battleships/issues"
+  },
+  "homepage": "https://github.com/grich88/gorbagana-battleships#readme"
+} 

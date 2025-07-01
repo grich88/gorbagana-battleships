@@ -11,6 +11,9 @@ import { toast } from 'react-hot-toast';
 // Import wallet adapter CSS
 require('@solana/wallet-adapter-react-ui/styles.css');
 
+// Import Gorbagana service
+import { gorbaganaService } from '../lib/gorbaganaService';
+
 type Props = {
   children: ReactNode;
 };
@@ -170,16 +173,31 @@ const WalletContextProvider: FC<Props> = ({ children }) => {
     conflictingWallets: []
   });
 
-  // Initialize optimal RPC endpoint
+  // Initialize optimal RPC endpoint and Gorbagana service
   useEffect(() => {
     const initializeRPC = async () => {
       try {
         const bestEndpoint = await getBestRPCEndpoint();
         setSelectedEndpoint(bestEndpoint);
         
+        // Initialize Gorbagana service with the best endpoint
+        if (bestEndpoint.includes('gorbagana') || bestEndpoint.includes('gorchain')) {
+          console.log('🌐 Initializing Gorbagana service with endpoint:', bestEndpoint);
+          gorbaganaService.switchEndpoint(bestEndpoint);
+          
+          // Test Gorbagana connection
+          const isConnected = await gorbaganaService.testConnection();
+          if (isConnected) {
+            console.log('✅ Gorbagana service connected successfully');
+          } else {
+            console.warn('⚠️ Gorbagana service connection test failed');
+          }
+        }
+        
         // Store selected endpoint for debugging
         if (typeof window !== 'undefined') {
           localStorage.setItem('gorbagana_battleship_rpc', bestEndpoint);
+          localStorage.setItem('gorbagana_service_endpoint', bestEndpoint);
         }
       } catch (error) {
         console.error('Failed to initialize RPC endpoint:', error);

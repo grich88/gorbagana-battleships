@@ -1068,8 +1068,8 @@ const BattleshipGame: React.FC = () => {
           </div>
         )}
 
-        {/* Game setup and sharing section */}
-        {gamePhase === 'setup' && !battleshipGame && showGameModeSelector === false && selectedGameMode && (
+        {/* Game setup and sharing section - ALWAYS show if no active game */}
+        {gamePhase === 'setup' && !battleshipGame && (
           <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">

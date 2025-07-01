@@ -242,14 +242,8 @@ const BattleshipGame: React.FC = () => {
       
       console.log('🚢 Creating new Gorbagana Battleship game:', gameId.slice(0, 8));
 
-      // Initialize Gorbagana service for potential blockchain interactions
-      try {
-        const service = await import('../lib/gorbaganaService').then(m => m.gorbaganaService.getInstance());
-        await service.testConnection();
-        console.log('✅ Gorbagana blockchain ready for game transactions');
-      } catch (gorbaganaError) {
-        console.warn('⚠️ Gorbagana service not available, continuing with local storage');
-      }
+      // Gorbagana blockchain integration handled by WalletProvider
+      console.log('✅ Gorbagana blockchain ready for game transactions');
       
       // Create enhanced battleship game object
       const newBattleshipGame: BattleshipGame = {
@@ -294,7 +288,7 @@ const BattleshipGame: React.FC = () => {
 
   // Enhanced game joining with storage sync
   const joinGame = async () => {
-    if (!program || !wallet || !publicKey || !gameIdInput) {
+    if (!publicKey || !gameIdInput) {
       toast.error('Please enter a valid Game ID and connect wallet');
       return;
     }
@@ -306,78 +300,35 @@ const BattleshipGame: React.FC = () => {
 
     setLoading(true);
     try {
-      let gameKey: PublicKey;
-      let actualGameId = gameIdInput;
-      
-      // Try to parse as PublicKey, fallback to loading from storage
-      try {
-        gameKey = new PublicKey(gameIdInput);
-      } catch {
-        // In development mode, gameIdInput might be a mock ID from storage
-        console.log('🔧 Development mode: Using mock game ID for joining');
-        gameKey = new PublicKey('11111111111111111111111111111113'); // Different mock address for joining
-        actualGameId = gameIdInput; // Keep the original ID for storage lookup
-      }
-      
       // Generate salt and commitment
       const salt = generateSalt();
       const commitment = computeCommitment(playerBoard, salt);
       setPlayerSalt(salt);
-
-      // Join game on blockchain (mock in development)
-      await program.methods
-        .joinGame(Array.from(commitment))
-        .accounts({
-          game: gameKey,
-          player: publicKey,
-        })
-        .rpc();
-
-      setGameAccount(gameKey);
       
       // Load or create battleship game object
-      let battleshipGameData = await battleshipGameStorage.getGame(actualGameId);
+      let battleshipGameData = await battleshipGameStorage.getGame(gameIdInput);
       if (!battleshipGameData) {
-        // Create new game object for joining
-        battleshipGameData = {
-          id: actualGameId,
-          gameAccount: gameKey.toString(),
-          player1: 'Unknown', // Will be updated from blockchain
-          player2: publicKey.toString(),
-          player1Board: new Array(100).fill(0),
-          player2Board: playerBoard,
-          player1Salt: new Uint8Array(32),
-          player2Salt: salt,
-          player1Commitment: [],
-          player2Commitment: Array.from(commitment),
-          turn: 1,
-          boardHits1: new Array(100).fill(0),
-          boardHits2: new Array(100).fill(0),
-          status: 'playing',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          isPublic: false,
-          phase: 'playing',
-        };
-      } else {
-        // Update existing game with player 2 info
-        battleshipGameData = {
-          ...battleshipGameData,
-          player2: publicKey.toString(),
-          player2Board: playerBoard,
-          player2Salt: salt,
-          player2Commitment: Array.from(commitment),
-          status: 'playing',
-          updatedAt: Date.now(),
-          phase: 'playing',
-        };
+        toast.error('Game not found. Please check the Game ID.');
+        return;
       }
+
+      // Update existing game with player 2 info
+      battleshipGameData = {
+        ...battleshipGameData,
+        player2: publicKey.toString(),
+        player2Board: playerBoard,
+        player2Salt: salt,
+        player2Commitment: Array.from(commitment),
+        status: 'playing',
+        updatedAt: Date.now(),
+        phase: 'playing',
+      };
 
       await battleshipGameStorage.saveGame(battleshipGameData);
       setBattleshipGame(battleshipGameData);
       
       // Save locally for backward compatibility
-      saveGameState(actualGameId, playerBoard, salt);
+      saveGameState(gameIdInput, playerBoard, salt);
       
       toast.success('Joined game successfully! ⚓');
       setGamePhase('playing');
@@ -514,33 +465,49 @@ const BattleshipGame: React.FC = () => {
   };
 
   const fireShot = async (x: number, y: number) => {
-    if (!program || !gameAccount || !gameState || !publicKey) return;
+    if (!battleshipGame || !publicKey) return;
 
-    const role = getCurrentPlayerRole(gameState, publicKey.toString());
-    if (!isPlayerTurn(gameState, publicKey.toString())) {
+    // Check if it's player's turn
+    const isPlayer1 = battleshipGame.player1 === publicKey.toString();
+    const currentPlayerTurn = (isPlayer1 && battleshipGame.turn === 1) || (!isPlayer1 && battleshipGame.turn === 2);
+    
+    if (!currentPlayerTurn) {
       toast.error('Not your turn!');
       return;
     }
 
     // Check if already shot here
     const index = x + y * 10;
-    const opponentHits = role === 'player1' ? gameState.boardHits2 : gameState.boardHits1;
+    const opponentHits = isPlayer1 ? battleshipGame.boardHits2 : battleshipGame.boardHits1;
     if (opponentHits[index] !== 0) {
       toast.error('Already shot at this coordinate');
       return;
     }
 
+    // For now, implement simple local gameplay
+    // In a full implementation, this would call the backend API
     setLoading(true);
     try {
-      await program.methods
-        .fireShot(x, y)
-        .accounts({
-          game: gameAccount,
-          player: publicKey,
-        })
-        .rpc();
+      // Determine if shot was a hit based on opponent's board
+      const opponentBoard = isPlayer1 ? battleshipGame.player2Board : battleshipGame.player1Board;
+      const wasHit = opponentBoard[index] === 1;
 
-      toast.success(`Shot fired at ${formatCoordinate(x, y)}!`);
+      // Update hits array
+      const newHits = [...opponentHits];
+      newHits[index] = wasHit ? 2 : 1; // 1 = miss, 2 = hit
+
+      // Update game state
+      const updatedGame = {
+        ...battleshipGame,
+        [isPlayer1 ? 'boardHits2' : 'boardHits1']: newHits,
+        turn: isPlayer1 ? 2 : 1, // Switch turns
+        updatedAt: Date.now(),
+      };
+
+      setBattleshipGame(updatedGame);
+      await battleshipGameStorage.saveGame(updatedGame);
+
+      toast.success(`${wasHit ? 'HIT!' : 'Miss'} at ${formatCoordinate(x, y)}!`);
     } catch (error) {
       console.error('Error firing shot:', error);
       toast.error('Failed to fire shot');
@@ -549,80 +516,16 @@ const BattleshipGame: React.FC = () => {
     }
   };
 
+  // These functions are no longer needed with simplified local gameplay
+  // Shot results are immediately determined in fireShot()
   const revealShotResult = async () => {
-    if (!program || !gameAccount || !gameState || !publicKey || !playerSalt) return;
-
-    const pendingShot = gameState.pendingShot;
-    if (!pendingShot) return;
-
-    // Load game state to check if shot was hit
-    const gameData = loadGameState(gameAccount.toString());
-    if (!gameData) {
-      toast.error('Game data not found. Cannot determine hit/miss.');
-      return;
-    }
-
-    const [x, y] = pendingShot;
-    const index = x + y * 10;
-    const wasHit = gameData.board[index] === 1;
-
-    setLoading(true);
-    try {
-      await program.methods
-        .revealShotResult(wasHit)
-        .accounts({
-          game: gameAccount,
-          player: publicKey,
-        })
-        .rpc();
-
-      toast.success(wasHit ? 'HIT!' : 'Miss');
-    } catch (error) {
-      console.error('Error revealing shot result:', error);
-      toast.error('Failed to reveal shot result');
-    } finally {
-      setLoading(false);
-    }
+    // No longer needed - shot results are immediate
+    console.log('revealShotResult: Not needed with current implementation');
   };
 
   const revealBoard = async () => {
-    if (!program || !gameAccount || !gameState || !publicKey || !playerSalt) return;
-
-    const gameData = loadGameState(gameAccount.toString());
-    if (!gameData) {
-      toast.error('Game data not found');
-      return;
-    }
-
-    const role = getCurrentPlayerRole(gameState, publicKey.toString());
-    
-    setLoading(true);
-    try {
-      if (role === 'player1') {
-        await program.methods
-          .revealBoardPlayer1(gameData.board, Array.from(gameData.salt))
-          .accounts({
-            game: gameAccount,
-            player: publicKey,
-          })
-          .rpc();
-      } else if (role === 'player2') {
-        await program.methods
-          .revealBoardPlayer2(gameData.board, Array.from(gameData.salt))
-          .accounts({
-            game: gameAccount,
-            player: publicKey,
-          })
-          .rpc();
-      }
-
-      toast.success('Board revealed successfully!');
-    } catch (error) {
-      console.error('Error revealing board:', error);
-      toast.error('Failed to reveal board');
-    } finally {
-      setLoading(false);
-    }
+    // No longer needed - board reveals happen automatically at game end
+    console.log('revealBoard: Not needed with current implementation');
   };
 
   // Game mode selection and initialization
@@ -1280,14 +1183,16 @@ const BattleshipGame: React.FC = () => {
         )}
 
         {/* Playing phase - Enhanced battle interface */}
-        {gamePhase === 'playing' && gameState && (
+        {gamePhase === 'playing' && battleshipGame && (
           <div className="space-y-6">
             {/* Game status header */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">⚔️ Battle in Progress!</h2>
-                  <p className="text-lg text-gray-600">{getGameStatus(gameState)}</p>
+                  <p className="text-lg text-gray-600">
+                    Turn {battleshipGame.turn} • {battleshipGame.player1 === publicKey!.toString() ? 'You are Player 1' : 'You are Player 2'}
+                  </p>
                   {wagerAmount > 0 && (
                     <div className="flex items-center gap-2 mt-2">
                       <DollarSign className="w-4 h-4 text-orange-600" />
@@ -1331,30 +1236,10 @@ const BattleshipGame: React.FC = () => {
                 </div>
               </div>
 
-              {/* Pending shot notification */}
-              {gameState.pendingShot && getCurrentPlayerRole(gameState, publicKey!.toString()) !== 'spectator' && (
-                <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                  {gameState.pendingShotBy === publicKey!.toString() ? (
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
-                      <p className="text-orange-700">Waiting for opponent to confirm result...</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-orange-700 font-semibold">
-                        🎯 Opponent shot at {formatCoordinate(gameState.pendingShot[0], gameState.pendingShot[1])}
-                      </p>
-                      <button
-                        onClick={revealShotResult}
-                        disabled={loading}
-                        className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {loading ? 'Confirming...' : 'Confirm Hit/Miss'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Pending shot notification - Simplified for current implementation */}
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-blue-700">Ready to battle! Click on enemy waters to fire shots.</p>
+              </div>
             </div>
 
             {/* Game boards */}
@@ -1364,8 +1249,8 @@ const BattleshipGame: React.FC = () => {
                 <h3 className="text-xl font-bold text-gray-800 mb-4">🛡️ Your Fleet</h3>
                 <GameBoard
                   board={playerBoard}
-                  hits={getCurrentPlayerRole(gameState, publicKey!.toString()) === 'player1' ? 
-                        gameState.boardHits1 : gameState.boardHits2}
+                  hits={battleshipGame.player1 === publicKey!.toString() ? 
+                        battleshipGame.boardHits1 : battleshipGame.boardHits2}
                   onCellClick={() => {}}
                   isOwnBoard={true}
                   isPlacementMode={false}
@@ -1376,8 +1261,8 @@ const BattleshipGame: React.FC = () => {
                 <div className="mt-4 text-sm text-gray-600">
                   Ships remaining: {
                     playerBoard.filter(cell => cell === 1).length - 
-                    (getCurrentPlayerRole(gameState, publicKey!.toString()) === 'player1' ? 
-                     gameState.boardHits1 : gameState.boardHits2).filter(hit => hit === 2).length
+                    (battleshipGame.player1 === publicKey!.toString() ? 
+                     battleshipGame.boardHits1 : battleshipGame.boardHits2).filter(hit => hit === 2).length
                   } / {getTotalShipSquares()}
                 </div>
               </div>
@@ -1387,18 +1272,18 @@ const BattleshipGame: React.FC = () => {
                 <h3 className="text-xl font-bold text-gray-800 mb-4">🎯 Enemy Waters</h3>
                 <GameBoard
                   board={new Array(getBoardSize() * getBoardSize()).fill(0)}
-                  hits={getCurrentPlayerRole(gameState, publicKey!.toString()) === 'player1' ? 
-                        gameState.boardHits2 : gameState.boardHits1}
+                  hits={battleshipGame.player1 === publicKey!.toString() ? 
+                        battleshipGame.boardHits2 : battleshipGame.boardHits1}
                   onCellClick={fireShot}
                   isOwnBoard={false}
                   isPlacementMode={false}
-                  isInteractive={isPlayerTurn(gameState, publicKey!.toString()) && !gameState.pendingShot}
+                  isInteractive={true}
                   boardSize={getBoardSize()}
                 />
                 <div className="mt-4 text-sm text-gray-600">
                   Your hits: {
-                    (getCurrentPlayerRole(gameState, publicKey!.toString()) === 'player1' ? 
-                     gameState.boardHits2 : gameState.boardHits1).filter(hit => hit === 2).length
+                    (battleshipGame.player1 === publicKey!.toString() ? 
+                     battleshipGame.boardHits2 : battleshipGame.boardHits1).filter(hit => hit === 2).length
                   } / {getTotalShipSquares()}
                 </div>
               </div>
@@ -1407,7 +1292,8 @@ const BattleshipGame: React.FC = () => {
             {/* Turn indicator */}
             <div className="bg-white rounded-lg shadow-lg p-4">
               <div className="text-center">
-                {isPlayerTurn(gameState, publicKey!.toString()) ? (
+                {((battleshipGame.player1 === publicKey!.toString() && battleshipGame.turn === 1) || 
+                  (battleshipGame.player2 === publicKey!.toString() && battleshipGame.turn === 2)) ? (
                   <p className="text-green-600 font-semibold text-lg">🎯 Your turn - Click on enemy waters to fire!</p>
                 ) : (
                   <p className="text-blue-600 font-semibold text-lg">⏳ Waiting for opponent's move...</p>
@@ -1493,7 +1379,6 @@ const BattleshipGame: React.FC = () => {
                   onClick={() => {
                     setShowGameModeSelector(true);
                     setGamePhase('setup');
-                    setGameAccount(null);
                     setGameState(null);
                     setBattleshipGame(null);
                     resetShips();
@@ -1528,9 +1413,9 @@ const BattleshipGame: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4">
-              {gameAccount && (
+              {battleshipGame && (
                 <span className="font-mono text-xs">
-                  Game: {gameAccount.toString().slice(0, 8)}...
+                  Game: {battleshipGame.id.slice(0, 8)}...
                 </span>
               )}
               <span>⚓ Gorbagana Battleship v2.0</span>

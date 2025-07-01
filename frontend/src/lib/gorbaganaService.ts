@@ -43,6 +43,8 @@ interface GorbaganaTransactionResult {
 const GORBAGANA_RPC_ENDPOINTS = [
   'https://rpc.gorbagana.wtf/',
   'https://gorchain.wstf.io',
+  'https://rpc.gorchain.wstf.io', // Alternative endpoint
+  'https://api.gorbagana.wtf/', // Alternative API endpoint
 ];
 
 const GORBAGANA_CONSTANTS = {
@@ -60,7 +62,7 @@ class GorbaganaBlockchainService {
 
   constructor(config: GorbaganaConfig = {}) {
     this.endpoint = config.endpoint || GORBAGANA_RPC_ENDPOINTS[0];
-    this.timeout = config.timeout || 30000; // 30 seconds
+    this.timeout = config.timeout || 10000; // 10 seconds for faster testing
     this.retries = config.retries || 3;
 
     console.log(`🌐 Gorbagana Service initialized with endpoint: ${this.endpoint}`);
@@ -289,36 +291,23 @@ export async function selectOptimalGorbaganaEndpoint(): Promise<string> {
     try {
       console.log(`🔍 Testing RPC endpoint: ${endpoint}`);
       
-      // Skip localhost and CORS-restricted endpoints in production
+      // Skip localhost endpoints in production
       if (typeof window !== 'undefined' && 
           (endpoint.includes('localhost') || endpoint.includes('127.0.0.1'))) {
         console.log('⚠️ Skipping localhost endpoint in browser');
         continue;
       }
 
-      if (endpoint.includes('gorchain.wstf.io') && typeof window !== 'undefined') {
-        console.log('⚠️ Skipping Gorchain endpoint in development (CORS restriction)');
-        continue;
-      }
-
-      // Test Gorbagana endpoint
-      if (endpoint.includes('rpc.gorbagana.wtf')) {
-        console.log(`⚡ Testing Gorbagana endpoint: ${endpoint}`);
-        const service = new GorbaganaBlockchainService({ endpoint });
-        const isHealthy = await service.testConnection();
-        
-        if (isHealthy) {
-          console.log(`✅ Gorbagana endpoint healthy`);
-          return endpoint;
-        }
-      }
-      
-      // Test other endpoints as fallback
-      const service = new GorbaganaBlockchainService({ endpoint });
+      // Test any Gorbagana endpoint
+      console.log(`⚡ Testing Gorbagana endpoint: ${endpoint}`);
+      const service = new GorbaganaBlockchainService({ 
+        endpoint, 
+        timeout: 5000 // Shorter timeout for endpoint testing
+      });
       const isHealthy = await service.testConnection();
       
       if (isHealthy) {
-        console.log(`✅ Endpoint ${endpoint} is healthy`);
+        console.log(`✅ Gorbagana endpoint ${endpoint} is healthy`);
         return endpoint;
       }
     } catch (error: any) {
@@ -336,7 +325,7 @@ let gorbaganaServiceInstance: GorbaganaBlockchainService | null = null;
 
 export async function initializeGorbaganaService(): Promise<GorbaganaBlockchainService> {
   if (!gorbaganaServiceInstance) {
-    console.log('🚀🚀🚀 BATTLESHIP v2.0 - ENHANCED RPC ENDPOINTS LOADED');
+    console.log('🚀🚀🚀 BATTLESHIP v2.1 - MULTI-ENDPOINT GORBAGANA RPC LOADED');
     console.log('�� Primary RPC: https://rpc.gorbagana.wtf/');
     console.log('⚡ Secondary RPC: https://gorchain.wstf.io');
     console.log('⏰ DEPLOYMENT TIMESTAMP: 🔥 BATTLESHIP-v2.0-ENHANCED-RPC-2025-01-29 🔥');

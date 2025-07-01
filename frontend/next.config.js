@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  trailingSlash: true,
-  distDir: 'out',
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {

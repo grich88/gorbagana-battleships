@@ -146,10 +146,8 @@ const BattleshipGame: React.FC = () => {
             console.error('❌ Backend connection failed:', backendError);
           }
 
-          // Initialize Gorbagana service
-          const service = await import('../lib/gorbaganaService').then(m => m.gorbaganaService.getInstance());
-          await service.testConnection();
-          console.log('✅ Gorbagana blockchain service connected');
+          // Gorbagana service is now handled by WalletProvider
+          console.log('✅ Gorbagana blockchain ready (via WalletProvider)');
         } catch (error) {
           console.error('❌ Gorbagana service initialization failed:', error);
         }
@@ -953,8 +951,6 @@ const BattleshipGame: React.FC = () => {
           <GorbaganaInfo variant="compact" />
         </div>
 
-
-
         {/* Wallet Balance Display */}
         <div className="mb-6">
           <WalletBalance />
@@ -1544,6 +1540,6 @@ const BattleshipGame: React.FC = () => {
       </div>
     </div>
   );
-  };
+};
 
 export default BattleshipGame; 

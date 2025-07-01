@@ -842,6 +842,12 @@ const BattleshipGame: React.FC = () => {
     selectedGameMode
   });
 
+  // EMERGENCY FALLBACK: Always show game mode selector if wallet connected but no specific state
+  if (publicKey && !showGameModeSelector && !battleshipGame && gamePhase === 'setup') {
+    console.log('🚨 EMERGENCY FALLBACK: Forcing game mode selector to show');
+    setShowGameModeSelector(true);
+  }
+
   // Show wallet connection screen if not connected
   if (!publicKey) {
     return (
@@ -982,6 +988,24 @@ const BattleshipGame: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-blue-100 py-4">
       <div className="container mx-auto px-4 max-w-7xl">
+        
+        {/* EMERGENCY CALL-TO-ACTION - Always visible when wallet connected but no active game */}
+        {publicKey && !battleshipGame && gamePhase === 'setup' && (
+          <div className="bg-gradient-to-r from-red-500 to-pink-600 rounded-xl shadow-lg border-2 border-red-300 p-6 mb-6 text-center">
+            <h2 className="text-2xl font-bold text-white mb-4">🚨 NO ACTIVE GAME DETECTED 🚨</h2>
+            <p className="text-red-100 mb-4">Click below to start playing battleship!</p>
+            <button
+              onClick={() => {
+                console.log('🚨 EMERGENCY BUTTON CLICKED - Forcing game mode selector');
+                setShowGameModeSelector(true);
+              }}
+              className="bg-white text-red-600 font-bold py-3 px-8 rounded-lg hover:bg-red-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-lg"
+            >
+              🚀 EMERGENCY START BUTTON - CLICK HERE!
+            </button>
+          </div>
+        )}
+
         {/* Enhanced Header */}
         <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-6 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

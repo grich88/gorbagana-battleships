@@ -22,6 +22,7 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
   const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [wagerAmount, setWagerAmount] = useState<number>(currentWager);
+  const [wagerInput, setWagerInput] = useState<string>(currentWager > 0 ? currentWager.toString() : ''); // String for decimal input
 
   // Fetch balance using Solana SDK with Gorbagana RPC
   const fetchBalance = async () => {
@@ -50,6 +51,12 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
     }
   };
 
+  // Update input when currentWager prop changes
+  useEffect(() => {
+    setWagerAmount(currentWager);
+    setWagerInput(currentWager > 0 ? currentWager.toString() : '');
+  }, [currentWager]);
+
   // Auto-fetch balance on wallet connection
   useEffect(() => {
     if (connected && publicKey) {
@@ -61,7 +68,30 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
     }
   }, [connected, publicKey, connection]);
 
-  // Handle wager change
+  // Handle wager input change (for typing)
+  const handleWagerInputChange = (value: string) => {
+    // Allow empty string, numbers, and decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setWagerInput(value);
+      
+      // Convert to number and validate
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        if (numValue > balance) {
+          toast.error(`Insufficient balance. You have ${balance.toFixed(4)} GOR`);
+          return;
+        }
+        setWagerAmount(numValue);
+        onWagerChange?.(numValue);
+      } else if (value === '') {
+        // Empty input = 0 wager
+        setWagerAmount(0);
+        onWagerChange?.(0);
+      }
+    }
+  };
+
+  // Handle wager change (for quick buttons)
   const handleWagerChange = (amount: number) => {
     if (amount > balance) {
       toast.error(`Insufficient balance. You have ${balance.toFixed(4)} GOR`);
@@ -69,6 +99,7 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
     }
     
     setWagerAmount(amount);
+    setWagerInput(amount.toString()); // Update input display
     onWagerChange?.(amount);
   };
 
@@ -132,14 +163,12 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
                 <DollarSign className="h-4 w-4 text-gray-400" />
               </div>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                max={balance}
-                value={wagerAmount}
-                onChange={(e) => handleWagerChange(parseFloat(e.target.value) || 0)}
+                type="text"
+                inputMode="decimal"
+                value={wagerInput}
+                onChange={(e) => handleWagerInputChange(e.target.value)}
                 className="block w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0.00"
+                placeholder="Enter amount (e.g. 0.002)"
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                 <span className="text-gray-500 text-sm">GOR</span>

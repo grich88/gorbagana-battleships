@@ -197,6 +197,9 @@ const BattleshipGame: React.FC = () => {
       console.log(`🔗 Auto-joining shared game: ${sharedGameId}`);
       setGameIdInput(sharedGameId);
       
+      // Hide game mode selector when handling shared game
+      setShowGameModeSelector(false);
+      
       // Auto-join the game after a short delay to ensure wallet is ready
       setTimeout(async () => {
         try {
@@ -217,6 +220,8 @@ const BattleshipGame: React.FC = () => {
         } catch (error) {
           console.error('Auto-join failed:', error);
           toast.error('Failed to auto-join game. You can still join manually.');
+          // Reset to game mode selector on failure
+          setShowGameModeSelector(true);
         }
       }, 1500);
     }
@@ -828,6 +833,15 @@ const BattleshipGame: React.FC = () => {
     }
   };
 
+  // Debug logging for state
+  console.log('🔍 BattleshipGame state:', {
+    publicKey: publicKey?.toString().slice(0, 8) + '...',
+    showGameModeSelector,
+    gamePhase,
+    battleshipGame: battleshipGame?.id,
+    selectedGameMode
+  });
+
   // Show wallet connection screen if not connected
   if (!publicKey) {
     return (
@@ -1034,8 +1048,28 @@ const BattleshipGame: React.FC = () => {
           <WalletBalance />
         </div>
 
+        {/* Fallback: Show game mode selector if no active game and not in mode selector */}
+        {!showGameModeSelector && !battleshipGame && gamePhase === 'setup' && (
+          <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent mb-4">Ready to Start Playing?</h2>
+              <p className="text-gray-600">Choose your battle mode to begin</p>
+            </div>
+            
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowGameModeSelector(true)}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <Anchor className="w-5 h-5" />
+                Choose Battle Mode
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Game setup and sharing section */}
-        {gamePhase === 'setup' && (
+        {gamePhase === 'setup' && !battleshipGame && showGameModeSelector === false && selectedGameMode && (
           <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
@@ -1045,11 +1079,11 @@ const BattleshipGame: React.FC = () => {
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">Fleet Command Center</h2>
               </div>
               <button
-                onClick={() => setGamePhase('placement')}
+                onClick={() => setShowGameModeSelector(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Return to Fleet
+                Change Mode
               </button>
             </div>
 
@@ -1084,7 +1118,14 @@ const BattleshipGame: React.FC = () => {
                   </label>
                   
                   <button
-                    onClick={() => setGamePhase('placement')}
+                    onClick={() => {
+                      if (!selectedGameMode) {
+                        setShowGameModeSelector(true);
+                        toast.error('Please select a game mode first');
+                        return;
+                      }
+                      setGamePhase('placement');
+                    }}
                     disabled={loading}
                     className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >

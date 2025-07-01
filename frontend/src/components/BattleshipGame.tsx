@@ -49,7 +49,7 @@ import {
 } from '../lib/gameStorage';
 
 // Anchor program IDL and ID
-import IDL from '../../../target/idl/battleship.json';
+import IDL from '../../target/idl/battleship.json';
 const PROGRAM_ID = new PublicKey('11111111111111111111111111111112'); // System Program for development
 
 type GamePhase = 'setup' | 'placement' | 'waiting' | 'playing' | 'reveal' | 'finished';

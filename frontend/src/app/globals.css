@@ -7,6 +7,29 @@
   position: relative;
 }
 
+/* Ensure wallet buttons are always visible and properly styled */
+.wallet-adapter-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 150px !important;
+  min-height: 40px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+.wallet-adapter-button-trigger {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 150px !important;
+  min-height: 40px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
 .wallet-button-custom img,
 .wallet-button-custom svg {
   width: 20px !important;

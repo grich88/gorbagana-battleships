@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "lib": ["es6"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "declaration": true,
+    "outDir": "./dist/",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": ["tests/**/*", "app/**/*"],
+  "exclude": ["node_modules", "dist"]
+} 

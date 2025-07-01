@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global styles for the Battleship game */
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Custom styles for wallet adapter */
+.wallet-adapter-button {
+  @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded;
+}
+
+.wallet-adapter-button-trigger {
+  @apply bg-blue-600 hover:bg-blue-700;
+}
+
+/* Game board cell animations */
+.game-cell {
+  transition: all 0.2s ease-in-out;
+}
+
+.game-cell:hover {
+  transform: scale(1.05);
+}
+
+/* Ship placement preview */
+.ship-preview {
+  background-color: rgba(34, 197, 94, 0.3);
+  border: 2px dashed rgb(34, 197, 94);
+}
+
+/* Hit/Miss markers */
+.hit-marker {
+  color: #dc2626;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.miss-marker {
+  color: #ffffff;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Loading spinner */
+.spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Game status indicators */
+.status-waiting {
+  @apply text-yellow-600 font-semibold;
+}
+
+.status-playing {
+  @apply text-blue-600 font-semibold;
+}
+
+.status-winner {
+  @apply text-green-600 font-bold;
+}
+
+.status-loser {
+  @apply text-red-600 font-bold;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 768px) {
+  .game-boards-container {
+    flex-direction: column;
+    gap: 2rem;
+  }
+  
+  .game-board {
+    transform: scale(0.8);
+  }
+} 

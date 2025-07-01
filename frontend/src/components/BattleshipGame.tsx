@@ -260,15 +260,42 @@ const BattleshipGame: React.FC = () => {
       const commitment = computeCommitment(playerBoard, salt);
       setPlayerSalt(salt);
 
-      // Generate unique game ID
-      const gameId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+      // Generate shorter 4-digit game ID
+      const gameId = Math.floor(1000 + Math.random() * 9000).toString();
       
-      console.log('🚢 Creating new Gorbagana Battleship game:', gameId.slice(0, 8));
+      console.log('🚢 Creating new Gorbagana Battleship game:', gameId);
+
+      // Get board size for current game mode
+      const config = GAME_MODES[selectedGameMode];
+      const boardSize = config.boardSize * config.boardSize;
 
       // Gorbagana blockchain integration handled by WalletProvider
       console.log('✅ Gorbagana blockchain ready for game transactions');
+      
+      // Create escrow if wager amount > 0
+      let escrowAccount = '';
+      let escrowStatus = 'none';
+      
+      if (wagerAmount > 0) {
+        try {
+          console.log(`💰 Creating escrow for ${wagerAmount} GOR wager`);
+          const gorbaganaService = new GorbaganaBlockchainService();
+          const escrowResult = await gorbaganaService.getEscrowService().createEscrow(
+            publicKey.toString(), 
+            wagerAmount, 
+            gameId
+          );
+          escrowAccount = escrowResult.account;
+          escrowStatus = 'created';
+          console.log(`✅ Escrow account created: ${escrowAccount}`);
+          toast.success(`🔒 Escrow created for ${wagerAmount} GOR`);
+        } catch (escrowError) {
+          console.error('❌ Failed to create escrow:', escrowError);
+          // Continue with game creation but mark escrow as failed
+          escrowStatus = 'failed';
+          toast.warning('⚠️ Game created but escrow failed - playing without wager');
+        }
+      }
       
       // Create enhanced battleship game object
       const newBattleshipGame: BattleshipGame = {
@@ -278,8 +305,8 @@ const BattleshipGame: React.FC = () => {
         player1Salt: salt,
         player1Commitment: Array.from(commitment),
         turn: 1,
-        boardHits1: new Array(100).fill(0),
-        boardHits2: new Array(100).fill(0),
+        boardHits1: new Array(boardSize).fill(0),
+        boardHits2: new Array(boardSize).fill(0),
         status: 'waiting',
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -287,7 +314,8 @@ const BattleshipGame: React.FC = () => {
         creatorName: 'Captain ' + publicKey.toString().slice(0, 6),
         phase: 'waiting',
         wagerAmount: wagerAmount,
-        escrowStatus: wagerAmount > 0 ? 'pending' : 'none',
+        escrowAccount: escrowAccount,
+        escrowStatus: escrowStatus,
       };
 
       // Save to enhanced storage system
@@ -337,6 +365,25 @@ const BattleshipGame: React.FC = () => {
         return;
       }
 
+      // Add player 2 to escrow if there's a wager
+      let updatedEscrowStatus = battleshipGameData.escrowStatus;
+      if (battleshipGameData.wagerAmount > 0 && battleshipGameData.escrowAccount) {
+        try {
+          console.log(`💰 Adding player 2 to escrow for ${battleshipGameData.wagerAmount} GOR wager`);
+          const gorbaganaService = new GorbaganaBlockchainService();
+          await gorbaganaService.getEscrowService().addPlayerToEscrow(
+            battleshipGameData.escrowAccount,
+            publicKey.toString()
+          );
+          updatedEscrowStatus = 'active';
+          console.log(`✅ Player 2 added to escrow account: ${battleshipGameData.escrowAccount}`);
+          toast.success(`🔒 Joined escrow with ${battleshipGameData.wagerAmount} GOR stake`);
+        } catch (escrowError) {
+          console.error('❌ Failed to join escrow:', escrowError);
+          toast.warning('⚠️ Joined game but escrow join failed');
+        }
+      }
+
       // Update existing game with player 2 info
       battleshipGameData = {
         ...battleshipGameData,
@@ -347,6 +394,7 @@ const BattleshipGame: React.FC = () => {
         status: 'playing',
         updatedAt: Date.now(),
         phase: 'playing',
+        escrowStatus: updatedEscrowStatus,
       };
 
       await battleshipGameStorage.saveGame(battleshipGameData);
@@ -502,7 +550,8 @@ const BattleshipGame: React.FC = () => {
     }
 
     // Check if already shot here
-    const index = x + y * 10;
+    const boardSize = getBoardSize();
+    const index = x + y * boardSize;
     const opponentHits = isPlayer1 ? battleshipGame.boardHits2 : battleshipGame.boardHits1;
     if (opponentHits[index] !== 0) {
       toast.error('Already shot at this coordinate');
@@ -521,16 +570,63 @@ const BattleshipGame: React.FC = () => {
       const newHits = [...opponentHits];
       newHits[index] = wasHit ? 2 : 1; // 1 = miss, 2 = hit
 
+      // Check for win condition (all enemy ships sunk)
+      const enemyShipSquares = opponentBoard.filter(cell => cell === 1).length;
+      const enemyHitsReceived = newHits.filter(hit => hit === 2).length;
+      const gameWon = enemyHitsReceived >= enemyShipSquares;
+      
+      let gameStatus = battleshipGame.status;
+      let gamePhase = 'playing';
+      let winnerAddress = null;
+      
+      if (gameWon) {
+        gameStatus = 'finished';
+        gamePhase = 'finished';
+        winnerAddress = publicKey.toString();
+        
+        // Handle escrow payout for winner
+        if (battleshipGame.wagerAmount > 0 && battleshipGame.escrowAccount) {
+          try {
+            console.log(`🏆 Game won! Processing payout for ${battleshipGame.wagerAmount * 2} GOR`);
+            const gorbaganaService = new GorbaganaBlockchainService();
+            const payoutResult = await gorbaganaService.completeGameWithPayouts(
+              battleshipGame.id,
+              winnerAddress,
+              battleshipGame.player1,
+              battleshipGame.player2 || '',
+              battleshipGame.wagerAmount,
+              battleshipGame.escrowAccount
+            );
+            
+            if (payoutResult.success) {
+              toast.success(`🎉 Victory! ${battleshipGame.wagerAmount * 2} GOR transferred to your wallet!`);
+            }
+          } catch (payoutError) {
+            console.error('❌ Payout failed:', payoutError);
+            toast.warning('🏆 You won! But payout processing failed.');
+          }
+        }
+        
+        toast.success(`🎉 VICTORY! You sank all enemy ships!`);
+      }
+
       // Update game state
       const updatedGame = {
         ...battleshipGame,
         [isPlayer1 ? 'boardHits2' : 'boardHits1']: newHits,
-        turn: isPlayer1 ? 2 : 1, // Switch turns
+        turn: gameWon ? battleshipGame.turn : (isPlayer1 ? 2 : 1), // Don't switch turns if game is won
+        status: gameStatus,
+        phase: gamePhase,
+        winner: gameWon ? (isPlayer1 ? 1 : 2) : undefined,
         updatedAt: Date.now(),
       };
 
       setBattleshipGame(updatedGame);
       await battleshipGameStorage.saveGame(updatedGame);
+      
+      if (gameWon) {
+        setGamePhase('finished');
+      }
 
       toast.success(`${wasHit ? 'HIT!' : 'Miss'} at ${formatCoordinate(x, y)}!`);
     } catch (error) {
@@ -1199,64 +1295,70 @@ const BattleshipGame: React.FC = () => {
           </div>
         )}
 
-        {/* Waiting for opponent */}
+        {/* Waiting for opponent - Show game board with sharing interface */}
         {gamePhase === 'waiting' && battleshipGame && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">⏳ Waiting for Opponent</h2>
-              <p className="text-gray-600 mb-6">Share your game to invite someone to play!</p>
-              
-              {/* Game sharing options */}
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h3 className="font-semibold text-gray-800 mb-4">Share Your Game</h3>
+          <div className="space-y-6">
+            {/* Share and wait header */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">🚢 Game Ready!</h2>
+                <p className="text-gray-600 mb-4">Game ID: <span className="font-mono font-bold text-blue-600">{battleshipGame.id}</span></p>
+                <p className="text-gray-600 mb-6">Share with your opponent to start the battle!</p>
                 
-                <div className="space-y-4">
-                  {/* Game ID */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={battleshipGame.id}
-                      readOnly
-                      className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"
-                    />
-                    <button
-                      onClick={copyGameId}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copy ID
-                    </button>
-                  </div>
-                  
-                  {/* Share buttons */}
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={shareGame}
-                      className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      Share Game
-                    </button>
-                    
-                    {gameShareUrl && (
-                      <button
-                        onClick={() => window.open(gameShareUrl, '_blank')}
-                        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Open Link
-                      </button>
-                    )}
-                  </div>
+                {/* Compact sharing options */}
+                <div className="flex gap-2 justify-center mb-4">
+                  <button
+                    onClick={copyGameId}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy ID
+                  </button>
+                  <button
+                    onClick={shareGame}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share
+                  </button>
+                </div>
+
+                {/* Game status */}
+                <div className="text-sm text-gray-500">
+                  <p>⏳ Waiting for player 2 to join...</p>
+                  {battleshipGame.wagerAmount > 0 && (
+                    <p className="text-orange-600 font-medium">💰 Wager: {battleshipGame.wagerAmount} GOR • Escrow: {battleshipGame.escrowStatus}</p>
+                  )}
+                  {battleshipGame.isPublic && <p>📢 Public game</p>}
                 </div>
               </div>
+            </div>
 
-              {/* Game status */}
-              <div className="text-sm text-gray-500">
-                <p>Game Status: {battleshipGame.status}</p>
-                <p>Created: {new Date(battleshipGame.createdAt).toLocaleString()}</p>
-                {battleshipGame.isPublic && <p>📢 This is a public game</p>}
+            {/* Show your fleet while waiting */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">🛡️ Your Fleet (Ready for Battle)</h3>
+              <div className="flex justify-center">
+                <GameBoard
+                  board={playerBoard}
+                  hits={new Array(getBoardSize() * getBoardSize()).fill(0)}
+                  onCellClick={() => {}}
+                  isOwnBoard={true}
+                  isPlacementMode={false}
+                  isInteractive={false}
+                  showShips={true}
+                  boardSize={getBoardSize()}
+                />
               </div>
+              <div className="mt-4 text-center text-sm text-gray-600">
+                Fleet deployed: {getTotalShipSquares()} ship squares ready for battle
+              </div>
+            </div>
+
+            {/* Auto-start message */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+              <p className="text-blue-700 font-medium">
+                🎯 When your opponent joins, the battle will start automatically!
+              </p>
             </div>
           </div>
         )}
@@ -1412,42 +1514,80 @@ const BattleshipGame: React.FC = () => {
         )}
 
         {/* Finished phase */}
-        {gamePhase === 'finished' && gameState && (
+        {gamePhase === 'finished' && battleshipGame && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="text-center">
               <h2 className="text-3xl font-bold text-gray-800 mb-4">
-                🎉 Game Complete!
+                🎉 Battle Complete!
               </h2>
               
               <div className="mb-6">
-                {gameState.winner === 1 && (
-                  <div className="text-green-600">
-                    <h3 className="text-2xl font-bold">🏆 Player 1 Victories!</h3>
+                {battleshipGame.winner === 1 && (
+                  <div className={`${battleshipGame.player1 === publicKey!.toString() ? 'text-green-600' : 'text-red-600'}`}>
+                    <h3 className="text-2xl font-bold">
+                      {battleshipGame.player1 === publicKey!.toString() ? '🏆 VICTORY!' : '💀 DEFEAT'}
+                    </h3>
+                    <p className="text-lg mt-2">Player 1 Wins!</p>
                   </div>
                 )}
-                {gameState.winner === 2 && (
-                  <div className="text-blue-600">
-                    <h3 className="text-2xl font-bold">🏆 Player 2 Victories!</h3>
+                {battleshipGame.winner === 2 && (
+                  <div className={`${battleshipGame.player2 === publicKey!.toString() ? 'text-green-600' : 'text-red-600'}`}>
+                    <h3 className="text-2xl font-bold">
+                      {battleshipGame.player2 === publicKey!.toString() ? '🏆 VICTORY!' : '💀 DEFEAT'}
+                    </h3>
+                    <p className="text-lg mt-2">Player 2 Wins!</p>
                   </div>
                 )}
-                {gameState.winner === 0 && (
+                {battleshipGame.winner === 0 && (
                   <div className="text-gray-600">
-                    <h3 className="text-2xl font-bold">🤝 Game Draw</h3>
+                    <h3 className="text-2xl font-bold">🤝 Draw</h3>
                   </div>
                 )}
               </div>
+
+              {/* Payout information */}
+              {battleshipGame.wagerAmount > 0 && (
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6 mb-6">
+                  <h4 className="font-bold text-gray-800 mb-3">💰 Prize Pool</h4>
+                  {battleshipGame.winner && (
+                    <div className="space-y-2">
+                      <p className="text-lg font-semibold text-orange-600">
+                        Winner Takes: {(battleshipGame.wagerAmount * 2).toFixed(4)} GOR
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Escrow Status: {battleshipGame.escrowStatus}
+                      </p>
+                      {((battleshipGame.winner === 1 && battleshipGame.player1 === publicKey!.toString()) ||
+                        (battleshipGame.winner === 2 && battleshipGame.player2 === publicKey!.toString())) && (
+                        <p className="text-green-600 font-medium">🎉 Payout processed to your wallet!</p>
+                      )}
+                    </div>
+                  )}
+                  {!battleshipGame.winner && (
+                    <p className="text-gray-600">
+                      Draw - Each player refunded {battleshipGame.wagerAmount.toFixed(4)} GOR
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Game statistics */}
               <div className="bg-gray-50 rounded-lg p-6 mb-6">
                 <h4 className="font-semibold text-gray-800 mb-4">📊 Battle Statistics</h4>
                 <div className="grid md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="font-medium">Player 1 Hits: {gameState.hitsCount1}</p>
-                    <p className="font-medium">Player 2 Hits: {gameState.hitsCount2}</p>
+                    <p className="font-medium">Your Hits: {
+                      (battleshipGame.player1 === publicKey!.toString() ? 
+                       battleshipGame.boardHits2 : battleshipGame.boardHits1).filter(hit => hit === 2).length
+                    }</p>
+                    <p className="font-medium">Enemy Hits on You: {
+                      (battleshipGame.player1 === publicKey!.toString() ? 
+                       battleshipGame.boardHits1 : battleshipGame.boardHits2).filter(hit => hit === 2).length
+                    }</p>
                   </div>
                   <div>
-                    <p className="font-medium">Total Shots: {gameState.turn}</p>
-                    <p className="font-medium">Both Boards Revealed: ✅</p>
+                    <p className="font-medium">Game Mode: {GAME_MODES[selectedGameMode].name}</p>
+                    <p className="font-medium">Board Size: {getBoardSize()}x{getBoardSize()}</p>
                   </div>
                 </div>
               </div>
@@ -1467,15 +1607,13 @@ const BattleshipGame: React.FC = () => {
                   🔄 New Game
                 </button>
                 
-                {battleshipGame && (
-                  <button
-                    onClick={shareGame}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 justify-center"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share Result
-                  </button>
-                )}
+                <button
+                  onClick={shareGame}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 justify-center"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share Result
+                </button>
               </div>
             </div>
           </div>

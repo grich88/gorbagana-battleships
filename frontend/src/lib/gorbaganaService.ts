@@ -535,9 +535,6 @@ export async function initializeGorbaganaService(): Promise<GorbaganaBlockchainS
   return gorbaganaServiceInstance;
 }
 
-// Export the service initialization function
-export { GorbaganaBlockchainService };
-
 // Export default service instance (will be initialized on first use)
 export const gorbaganaService = {
   async getInstance(): Promise<GorbaganaBlockchainService> {

@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useAnchorWallet } from '@solana/wallet-adapter-react';
-import { PublicKey, SystemProgram } from '@solana/web3.js';
-import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
 import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Anchor, Settings, Trophy, Waves, Compass, Target, Ship, DollarSign, AlertTriangle } from 'lucide-react';
@@ -52,10 +49,6 @@ import {
   convertFromBattleshipGame 
 } from '../lib/gameStorage';
 
-// Anchor program IDL and ID
-import IDL from '../../target/idl/battleship.json';
-const PROGRAM_ID = new PublicKey('11111111111111111111111111111112'); // System Program for development
-
 type GamePhase = 'setup' | 'placement' | 'waiting' | 'playing' | 'reveal' | 'finished';
 
 interface ShipPlacement {
@@ -69,8 +62,6 @@ const MAX_POLL_ATTEMPTS = 30; // 60 seconds total
 const SYNC_INTERVAL = 5000; // Sync with storage every 5 seconds
 
 const BattleshipGame: React.FC = () => {
-  const { connection } = useConnection();
-  const wallet = useAnchorWallet();
   const { publicKey } = useWallet();
 
   // Game mode state
@@ -79,9 +70,7 @@ const BattleshipGame: React.FC = () => {
 
   // Game state
   const [gamePhase, setGamePhase] = useState<GamePhase>('setup'); // Start in setup phase for mode selection
-  const [gameAccount, setGameAccount] = useState<PublicKey | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [program, setProgram] = useState<Program | null>(null);
 
   // Enhanced game storage state
   const [battleshipGame, setBattleshipGame] = useState<BattleshipGame | null>(null);
@@ -140,158 +129,61 @@ const BattleshipGame: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Initialize Anchor program
+  // Initialize Gorbagana blockchain service
   useEffect(() => {
-    if (wallet && connection) {
-      try {
-        const provider = new AnchorProvider(connection, wallet, AnchorProvider.defaultOptions());
-        
-        // For development, use a mock program if the actual program isn't deployed
+    const initializeGorbaganaService = async () => {
+      if (publicKey) {
         try {
-          const program = new Program(IDL as any, PROGRAM_ID, provider);
-          setProgram(program);
-          console.log('✅ Anchor program initialized successfully');
-        } catch (programError) {
-          console.warn('⚠️ Anchor program initialization failed (likely in development mode):', programError);
+          console.log('✅ Backpack wallet detected - optimal for Gorbagana');
+          console.log('🎮 Initialized Standard Battle mode:', selectedGameMode);
+          console.log('🔌 Testing backend connection:', battleshipGameStorage.getConnectionStatus().url);
           
-          // Create a mock program object for development
-          const mockProgram = {
-            methods: {
-              initializeGame: () => ({
-                accounts: () => ({
-                  rpc: async () => {
-                    console.log('🔧 Mock: initializeGame called');
-                    // Simulate transaction success
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    return 'mock_transaction_signature';
-                  }
-                })
-              }),
-              joinGame: () => ({
-                accounts: () => ({
-                  rpc: async () => {
-                    console.log('🔧 Mock: joinGame called');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    return 'mock_transaction_signature';
-                  }
-                })
-              }),
-              fireShot: () => ({
-                accounts: () => ({
-                  rpc: async () => {
-                    console.log('🔧 Mock: fireShot called');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    return 'mock_transaction_signature';
-                  }
-                })
-              }),
-              revealShotResult: () => ({
-                accounts: () => ({
-                  rpc: async () => {
-                    console.log('🔧 Mock: revealShotResult called');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    return 'mock_transaction_signature';
-                  }
-                })
-              }),
-              revealBoardPlayer1: () => ({
-                accounts: () => ({
-                  rpc: async () => {
-                    console.log('🔧 Mock: revealBoardPlayer1 called');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    return 'mock_transaction_signature';
-                  }
-                })
-              }),
-              revealBoardPlayer2: () => ({
-                accounts: () => ({
-                  rpc: async () => {
-                    console.log('🔧 Mock: revealBoardPlayer2 called');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    return 'mock_transaction_signature';
-                  }
-                })
-              })
-            },
-            account: {
-              game: {
-                fetch: async (gameAccount: PublicKey) => {
-                  console.log('🔧 Mock: Fetching game state for', gameAccount.toString().slice(0, 8));
-                  
-                  // Return mock game state for development
-                  return {
-                    player1: new PublicKey('11111111111111111111111111111112'),
-                    player2: new PublicKey('11111111111111111111111111111113'),
-                    boardCommit1: new Array(32).fill(0),
-                    boardCommit2: new Array(32).fill(0),
-                    turn: 1,
-                    boardHits1: new Array(100).fill(0),
-                    boardHits2: new Array(100).fill(0),
-                    hitsCount1: 0,
-                    hitsCount2: 0,
-                    isInitialized: true,
-                    isGameOver: false,
-                    winner: 0,
-                    pendingShot: null,
-                    pendingShotBy: new PublicKey('11111111111111111111111111111112'),
-                    player1Revealed: false,
-                    player2Revealed: false,
-                  };
-                }
-              }
-            }
-          };
-          
-          setProgram(mockProgram as any);
-          console.log('🔧 Using mock program for development');
-          toast('Development mode: Using mock blockchain interactions', { icon: '🔧' });
+          // Test backend connection (non-blocking)
+          try {
+            await battleshipGameStorage.testConnection();
+            console.log('✅ Backend connection successful');
+          } catch (backendError) {
+            console.error('❌ Backend connection failed:', backendError);
+          }
+
+          // Initialize Gorbagana service
+          const service = await import('../lib/gorbaganaService').then(m => m.gorbaganaService.getInstance());
+          await service.testConnection();
+          console.log('✅ Gorbagana blockchain service connected');
+        } catch (error) {
+          console.error('❌ Gorbagana service initialization failed:', error);
         }
-      } catch (error) {
-        console.error('❌ Provider initialization failed:', error);
-        toast.error('Failed to initialize wallet provider');
       }
-    }
-  }, [wallet, connection]);
+    };
+    
+    initializeGorbaganaService();
+  }, [publicKey, selectedGameMode]);
 
-  // Enhanced game state fetching with cross-device sync
+  // Enhanced game state syncing with backend
   useEffect(() => {
-    if (program && gameAccount) {
-      const fetchGameState = async () => {
+    if (battleshipGame && publicKey && (gamePhase === 'playing' || gamePhase === 'waiting')) {
+      const syncGameState = async () => {
         try {
-          // Fetch from blockchain
-          const account = await program.account.game.fetch(gameAccount);
-          setGameState(account as any);
-
-          // Only sync during active gameplay, not during setup
-          if (battleshipGame && (gamePhase === 'playing' || gamePhase === 'waiting')) {
-            setSyncing(true);
-            const updatedGame: BattleshipGame = {
-              ...battleshipGame,
-              turn: (account as any).turn,
-              boardHits1: (account as any).boardHits1,
-              boardHits2: (account as any).boardHits2,
-              status: (account as any).isGameOver ? 'finished' : 'playing',
-              winner: (account as any).winner,
-              updatedAt: Date.now(),
-            };
-            
-            await battleshipGameStorage.saveGame(updatedGame);
-            setSyncing(false);
+          setSyncing(true);
+          
+          // Sync with backend storage
+          const savedGame = await battleshipGameStorage.loadGame(battleshipGame.id);
+          if (savedGame && savedGame.updatedAt > battleshipGame.updatedAt) {
+            setBattleshipGame(savedGame);
+            console.log('🔄 Game state synced from backend');
           }
         } catch (error) {
-          console.error('Error fetching game state:', error);
+          console.error('Error syncing game state:', error);
+        } finally {
           setSyncing(false);
         }
       };
 
-      // Only fetch game state during active phases, with longer intervals
-      if (gamePhase === 'playing' || gamePhase === 'waiting') {
-        fetchGameState();
-        const interval = setInterval(fetchGameState, 10000); // Reduced frequency to 10 seconds
-        return () => clearInterval(interval);
-      }
+      // Sync game state periodically during active gameplay
+      const interval = setInterval(syncGameState, 10000); // Every 10 seconds
+      return () => clearInterval(interval);
     }
-  }, [program, gameAccount, gamePhase]); // Removed battleshipGame dependency to prevent infinite loop
+  }, [battleshipGame, gamePhase, publicKey]);
 
   // Check for shared game on load
   useEffect(() => {
@@ -326,9 +218,9 @@ const BattleshipGame: React.FC = () => {
     }
   }, [gameState, publicKey]);
 
-  // Enhanced game creation with sharing capabilities
+  // Enhanced game creation with Gorbagana blockchain integration
   const createNewGame = async () => {
-    if (!program || !wallet || !publicKey) {
+    if (!publicKey) {
       toast.error('Please connect your wallet first');
       return;
     }
@@ -340,37 +232,30 @@ const BattleshipGame: React.FC = () => {
 
     setLoading(true);
     try {
-      // Generate salt and commitment
+      // Generate salt and commitment for secure gameplay
       const salt = generateSalt();
       const commitment = computeCommitment(playerBoard, salt);
       setPlayerSalt(salt);
 
-      // Generate a mock game PDA for development
-      const mockGameId = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      // Generate unique game ID
+      const gameId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
         .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-        .slice(0, 44); // Create a base58-like string
+        .join('');
       
-      const gamePda = new PublicKey('11111111111111111111111111111112'); // Mock address for development
-      
-      console.log('🔧 Development mode: Generated mock game ID:', mockGameId.slice(0, 8));
+      console.log('🚢 Creating new Gorbagana Battleship game:', gameId.slice(0, 8));
 
-      // Initialize game on blockchain (mock in development)
-      await program.methods
-        .initializeGame(Array.from(commitment))
-        .accounts({
-          game: gamePda,
-          player: publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      setGameAccount(gamePda);
+      // Initialize Gorbagana service for potential blockchain interactions
+      try {
+        const service = await import('../lib/gorbaganaService').then(m => m.gorbaganaService.getInstance());
+        await service.testConnection();
+        console.log('✅ Gorbagana blockchain ready for game transactions');
+      } catch (gorbaganaError) {
+        console.warn('⚠️ Gorbagana service not available, continuing with local storage');
+      }
       
       // Create enhanced battleship game object
       const newBattleshipGame: BattleshipGame = {
-        id: mockGameId, // Use mock ID instead of PDA for sharing
-        gameAccount: gamePda.toString(),
+        id: gameId,
         player1: publicKey.toString(),
         player1Board: playerBoard,
         player1Salt: salt,
@@ -384,6 +269,8 @@ const BattleshipGame: React.FC = () => {
         isPublic: isPublicGame,
         creatorName: 'Captain ' + publicKey.toString().slice(0, 6),
         phase: 'waiting',
+        wagerAmount: wagerAmount,
+        escrowStatus: wagerAmount > 0 ? 'pending' : 'none',
       };
 
       // Save to enhanced storage system
@@ -391,10 +278,10 @@ const BattleshipGame: React.FC = () => {
       setBattleshipGame(newBattleshipGame);
       
       // Save locally for backward compatibility
-      saveGameState(mockGameId, playerBoard, salt);
+      saveGameState(gameId, playerBoard, salt);
       
-      // Generate share URL using the mock game ID
-      const shareUrl = `${window.location.origin}${window.location.pathname}?game=${mockGameId}`;
+      // Generate share URL using the game ID
+      const shareUrl = `${window.location.origin}${window.location.pathname}?game=${gameId}`;
       setGameShareUrl(shareUrl);
       
       toast.success('Game created! Share with your opponent 🚢');

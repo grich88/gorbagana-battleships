@@ -53,11 +53,17 @@ app.use(helmet({
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'http://localhost:3001', 
+    'http://localhost:3001',
+    'http://localhost:3003',
+    'http://localhost:3004',
+    'http://localhost:3005',
     'https://gorbagana-battleship.vercel.app',
-    'https://gorbagana-battleship.netlify.app'
+    'https://gorbagana-battleship.netlify.app',
+    'https://gorbagana-battleship-frontend.onrender.com'
   ],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 app.use(compression());

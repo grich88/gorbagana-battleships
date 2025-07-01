@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { Wallet, TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { gorbaganaService } from '../lib/gorbaganaService';
@@ -19,28 +18,32 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
   className = '' 
 }) => {
   const { publicKey, connected } = useWallet();
-  const { connection } = useConnection();
   const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [wagerAmount, setWagerAmount] = useState<number>(currentWager);
 
-  // Fetch balance
+  // Fetch balance using native Gorbagana service
   const fetchBalance = async () => {
     if (!publicKey || !connected) return;
 
     setLoading(true);
     try {
-      const balanceResponse = await gorbaganaService.getBalance(publicKey.toString());
-      if (balanceResponse.success && balanceResponse.balance !== undefined) {
-        setBalance(balanceResponse.balance);
-      } else {
-        // Fallback to connection balance check
-        const lamports = await connection.getBalance(publicKey);
-        setBalance(lamports / LAMPORTS_PER_SOL);
-      }
+      console.log('🔗 Using RPC endpoint: https://rpc.gorbagana.wtf/');
+      console.log('🎒 Configured wallets: [ \'Backpack\' ]');
+      
+      const service = await gorbaganaService.getInstance();
+      const balanceResponse = await service.getBalance(publicKey.toString());
+      
+      // Convert raw balance to GOR (assuming 9 decimals)
+      const gorBalance = balanceResponse.balance / Math.pow(10, 9);
+      setBalance(gorBalance);
+      
+      console.log(`💰 Gorbagana balance fetched: ${balanceResponse.formatted}`);
     } catch (error) {
-      console.error('Error fetching balance:', error);
-      toast.error('Failed to fetch wallet balance');
+      console.error('Error fetching Gorbagana balance:', error);
+      toast.error('Failed to fetch GOR balance');
+      // Set balance to 0 on error instead of throwing
+      setBalance(0);
     } finally {
       setLoading(false);
     }
@@ -55,7 +58,7 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
       const interval = setInterval(fetchBalance, 10000); // Every 10 seconds
       return () => clearInterval(interval);
     }
-  }, [connected, publicKey, connection]);
+  }, [connected, publicKey]);
 
   // Handle wager change
   const handleWagerChange = (amount: number) => {

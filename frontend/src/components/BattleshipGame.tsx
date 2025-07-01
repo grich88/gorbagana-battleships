@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft } from 'lucide-react';
 
 import GameBoard from './GameBoard';
+import GorbaganaFaucet from './GorbaganaFaucet';
 import {
   STANDARD_FLEET,
   TOTAL_SHIP_SQUARES,
@@ -800,11 +801,15 @@ const BattleshipGame: React.FC = () => {
 
   if (!wallet) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-800 mb-4">⚓ Battleship on Gorbagana</h1>
-          <p className="text-gray-600 mb-8">Connect your Backpack wallet to start playing</p>
-          <WalletMultiButton />
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div className="max-w-md w-full space-y-6">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">⚓ Battleship on Gorbagana</h1>
+            <p className="text-gray-600 mb-8">Connect your Backpack wallet to start playing</p>
+            <WalletMultiButton />
+          </div>
+          
+          <GorbaganaFaucet variant="card" />
         </div>
       </div>
     );
@@ -849,10 +854,14 @@ const BattleshipGame: React.FC = () => {
               ))}
             </div>
 
-            <div className="mt-8 text-center">
-              <p className="text-gray-600 text-sm">
-                💡 <strong>Quick Battle</strong> for fast games • <strong>Standard</strong> for classic experience • <strong>Extended</strong> for epic warfare
-              </p>
+            <div className="mt-8 space-y-6">
+              <GorbaganaFaucet variant="card" />
+              
+              <div className="text-center">
+                <p className="text-gray-600 text-sm">
+                  💡 <strong>Quick Battle</strong> for fast games • <strong>Standard</strong> for classic experience • <strong>Extended</strong> for epic warfare
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -891,6 +900,7 @@ const BattleshipGame: React.FC = () => {
                 </div>
               )}
               
+              <GorbaganaFaucet variant="inline" />
               <WalletMultiButton />
             </div>
           </div>
@@ -962,6 +972,10 @@ const BattleshipGame: React.FC = () => {
                   >
                     Join Game 🤝
                   </button>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <GorbaganaFaucet variant="inline" className="justify-center" />
                 </div>
               </div>
             </div>

@@ -95,19 +95,57 @@ const deserializeGame = (game) => {
 };
 
 const cleanupOldGames = async () => {
-  const oneWeekAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
+  const now = new Date();
+  const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours
   let cleaned = 0;
   
   try {
     if (mongoConnected) {
+      // Find games to clean up with escrow handling
+      const expiredGames = await Game.find({
+        $or: [
+          // Idle games older than 30 minutes
+          { 
+            updatedAt: { $lt: thirtyMinutesAgo }, 
+            'gameState.phase': { $in: ['waiting', 'setup'] } 
+          },
+          // Abandoned games older than 1 hour
+          { 
+            abandonReason: { $exists: true }, 
+            updatedAt: { $lt: oneHourAgo } 
+          },
+          // Finished games older than 24 hours
+          { 
+            'gameState.phase': 'finished', 
+            finishedAt: { $lt: oneDayAgo } 
+          }
+        ]
+      });
+
+      // Handle escrow refunds before deletion
+      for (const game of expiredGames) {
+        if (game.wagerAmount > 0 && game.escrowStatus === 'locked') {
+          await handleEscrowRefund(game);
+        }
+      }
+
+      // Delete the games
       const result = await Game.deleteMany({
-        createdAt: { $lt: oneWeekAgo }
+        _id: { $in: expiredGames.map(g => g._id) }
       });
       cleaned = result.deletedCount;
     } else {
       // In-memory cleanup
       for (const [gameId, game] of inMemoryGames.entries()) {
-        if (game.createdAt < oneWeekAgo.getTime()) {
+        const gameTime = new Date(game.updatedAt || game.createdAt);
+        const shouldCleanup = 
+          (gameTime < thirtyMinutesAgo && ['waiting', 'setup'].includes(game.status)) ||
+          (game.abandonReason && gameTime < oneHourAgo) ||
+          (game.status === 'finished' && gameTime < oneDayAgo);
+
+        if (shouldCleanup) {
           inMemoryGames.delete(gameId);
           cleaned++;
         }
@@ -119,6 +157,27 @@ const cleanupOldGames = async () => {
   } catch (error) {
     console.error('❌ Error during cleanup:', error);
     return 0;
+  }
+};
+
+// Handle escrow refund
+const handleEscrowRefund = async (game) => {
+  try {
+    console.log(`💰 Processing escrow refund for game ${game.id}`);
+    
+    // Update escrow status
+    game.escrowStatus = 'refunded';
+    game.abandonReason = game.abandonReason || 'timeout';
+    
+    if (mongoConnected) {
+      await game.save();
+    }
+    
+    console.log(`✅ Escrow refunded for game ${game.id}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error refunding escrow for game ${game.id}:`, error);
+    return false;
   }
 };
 
@@ -316,6 +375,230 @@ app.delete('/api/games/:gameId', async (req, res) => {
   } catch (error) {
     console.error('❌ Error deleting game:', error);
     res.status(500).json({ error: 'Failed to delete game' });
+  }
+});
+
+// Wager and Escrow Routes
+
+// Create escrow for game
+app.post('/api/games/:gameId/escrow', async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+    const { playerAddress, wagerAmount, transactionId } = req.body;
+    
+    if (!playerAddress || !wagerAmount || !transactionId) {
+      return res.status(400).json({ error: 'Missing required fields: playerAddress, wagerAmount, transactionId' });
+    }
+    
+    let game = null;
+    if (mongoConnected) {
+      game = await Game.findOne({ id: gameId });
+    } else {
+      game = inMemoryGames.get(gameId);
+    }
+    
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    // Update escrow data
+    if (!game.escrowData) {
+      game.escrowData = { creatorDeposit: 0, opponentDeposit: 0, transactionIds: [] };
+    }
+    
+    const isCreator = game.creator?.id === playerAddress || game.player1?.id === playerAddress;
+    if (isCreator) {
+      game.escrowData.creatorDeposit = wagerAmount;
+      game.playersDeposited.player1 = true;
+    } else {
+      game.escrowData.opponentDeposit = wagerAmount;
+      game.playersDeposited.player2 = true;
+    }
+    
+    game.escrowData.transactionIds.push(transactionId);
+    game.wagerAmount = wagerAmount;
+    
+    // Check if both players have deposited
+    if (game.playersDeposited.player1 && game.playersDeposited.player2) {
+      game.escrowStatus = 'locked';
+    } else {
+      game.escrowStatus = 'pending';
+    }
+    
+    game.updatedAt = new Date();
+    
+    if (mongoConnected) {
+      await game.save();
+    } else {
+      inMemoryGames.set(gameId, game);
+    }
+    
+    console.log(`💰 Escrow deposit for game ${gameId.slice(0, 8)}... by ${playerAddress.slice(0, 8)}...`);
+    res.json({ success: true, escrowStatus: game.escrowStatus });
+  } catch (error) {
+    console.error('❌ Error handling escrow deposit:', error);
+    res.status(500).json({ error: 'Failed to process escrow deposit' });
+  }
+});
+
+// Abandon game and handle escrow
+app.post('/api/games/:gameId/abandon', async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+    const { playerAddress, reason } = req.body;
+    
+    if (!playerAddress) {
+      return res.status(400).json({ error: 'Missing playerAddress' });
+    }
+    
+    let game = null;
+    if (mongoConnected) {
+      game = await Game.findOne({ id: gameId });
+    } else {
+      game = inMemoryGames.get(gameId);
+    }
+    
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    const isCreator = game.creator?.id === playerAddress || game.player1?.id === playerAddress;
+    const hasOpponent = game.player2 && game.player2.id;
+    const gameStarted = game.gameState.phase === 'playing' && game.moveHistory && game.moveHistory.length > 0;
+    
+    // Update game state
+    game.gameState.phase = 'abandoned';
+    game.abandonedBy = playerAddress;
+    game.abandonReason = reason || 'player_left';
+    game.updatedAt = new Date();
+    
+    // Handle escrow based on game state
+    let escrowAction = 'refund';
+    let beneficiary = null;
+    
+    if (game.wagerAmount > 0 && game.escrowStatus === 'locked') {
+      if (!hasOpponent || !gameStarted) {
+        // Game hasn't really started, refund both players
+        escrowAction = 'refund';
+        game.escrowStatus = 'refunded';
+      } else {
+        // Game started and someone abandoned, give to other player
+        beneficiary = isCreator ? game.player2?.id : game.player1?.id;
+        escrowAction = 'release';
+        game.escrowStatus = 'released';
+        game.gameState.winner = isCreator ? 'player2' : 'player1';
+      }
+    }
+    
+    if (mongoConnected) {
+      await game.save();
+    } else {
+      inMemoryGames.set(gameId, game);
+    }
+    
+    console.log(`🚪 Game ${gameId.slice(0, 8)}... abandoned by ${playerAddress.slice(0, 8)}... - Escrow: ${escrowAction}`);
+    res.json({ 
+      success: true, 
+      escrowAction,
+      beneficiary,
+      message: escrowAction === 'refund' ? 'Escrow will be refunded to both players' : `Escrow released to ${beneficiary}`
+    });
+  } catch (error) {
+    console.error('❌ Error handling game abandonment:', error);
+    res.status(500).json({ error: 'Failed to abandon game' });
+  }
+});
+
+// Claim winnings
+app.post('/api/games/:gameId/claim', async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+    const { playerAddress } = req.body;
+    
+    if (!playerAddress) {
+      return res.status(400).json({ error: 'Missing playerAddress' });
+    }
+    
+    let game = null;
+    if (mongoConnected) {
+      game = await Game.findOne({ id: gameId });
+    } else {
+      game = inMemoryGames.get(gameId);
+    }
+    
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    if (game.gameState.phase !== 'finished' || !game.gameState.winner) {
+      return res.status(400).json({ error: 'Game not finished or no winner' });
+    }
+    
+    const isWinner = 
+      (game.gameState.winner === 'player1' && (game.creator?.id === playerAddress || game.player1?.id === playerAddress)) ||
+      (game.gameState.winner === 'player2' && game.player2?.id === playerAddress);
+    
+    if (!isWinner) {
+      return res.status(403).json({ error: 'Only the winner can claim winnings' });
+    }
+    
+    if (game.escrowStatus === 'released') {
+      return res.status(400).json({ error: 'Winnings already claimed' });
+    }
+    
+    // Release escrow to winner
+    game.escrowStatus = 'released';
+    game.updatedAt = new Date();
+    
+    const totalWinnings = (game.escrowData.creatorDeposit || 0) + (game.escrowData.opponentDeposit || 0);
+    
+    if (mongoConnected) {
+      await game.save();
+    } else {
+      inMemoryGames.set(gameId, game);
+    }
+    
+    console.log(`🏆 Winnings claimed for game ${gameId.slice(0, 8)}... by ${playerAddress.slice(0, 8)}... - Amount: ${totalWinnings} GOR`);
+    res.json({ 
+      success: true, 
+      winnings: totalWinnings,
+      message: `${totalWinnings} GOR released to winner`
+    });
+  } catch (error) {
+    console.error('❌ Error handling winnings claim:', error);
+    res.status(500).json({ error: 'Failed to claim winnings' });
+  }
+});
+
+// Get escrow status
+app.get('/api/games/:gameId/escrow', async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+    
+    let game = null;
+    if (mongoConnected) {
+      game = await Game.findOne({ id: gameId });
+    } else {
+      game = inMemoryGames.get(gameId);
+    }
+    
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    const escrowInfo = {
+      gameId: game.id,
+      wagerAmount: game.wagerAmount || 0,
+      escrowStatus: game.escrowStatus || 'none',
+      escrowData: game.escrowData || {},
+      playersDeposited: game.playersDeposited || { player1: false, player2: false },
+      canClaim: game.gameState.phase === 'finished' && game.gameState.winner && game.escrowStatus === 'locked'
+    };
+    
+    res.json(escrowInfo);
+  } catch (error) {
+    console.error('❌ Error fetching escrow status:', error);
+    res.status(500).json({ error: 'Failed to fetch escrow status' });
   }
 });
 

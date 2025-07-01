@@ -7,11 +7,13 @@ import { PublicKey, SystemProgram } from '@solana/web3.js';
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
-import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Anchor, Settings, Trophy, Waves, Compass, Target, Ship } from 'lucide-react';
+import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Anchor, Settings, Trophy, Waves, Compass, Target, Ship, DollarSign, AlertTriangle } from 'lucide-react';
 
 import GameBoard from './GameBoard';
 import GorbaganaFaucet from './GorbaganaFaucet';
 import GorbaganaInfo from './GorbaganaInfo';
+import WalletBalance from './WalletBalance';
+import PublicGamesLobby from './PublicGamesLobby';
 import {
   STANDARD_FLEET,
   TOTAL_SHIP_SQUARES,
@@ -103,6 +105,12 @@ const BattleshipGame: React.FC = () => {
   // Public games lobby
   const [showPublicLobby, setShowPublicLobby] = useState(false);
   const [publicGames, setPublicGames] = useState<any[]>([]);
+  
+  // Wager and Escrow state
+  const [wagerAmount, setWagerAmount] = useState<number>(0);
+  const [escrowStatus, setEscrowStatus] = useState<'none' | 'pending' | 'locked' | 'released' | 'refunded'>('none');
+  const [canAbandon, setCanAbandon] = useState(false);
+  const [abandoning, setAbandoning] = useState(false);
 
   // Initialize game mode on component mount
   useEffect(() => {
@@ -800,6 +808,65 @@ const BattleshipGame: React.FC = () => {
     }
   };
 
+  // Handle wager change
+  const handleWagerChange = (amount: number) => {
+    setWagerAmount(amount);
+  };
+
+  // Abandon game
+  const abandonGame = async () => {
+    if (!publicKey || !battleshipGame?.id) {
+      toast.error('Cannot abandon game: missing required data');
+      return;
+    }
+
+    setAbandoning(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/games/${battleshipGame.id}/abandon`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerAddress: publicKey.toString(),
+          reason: 'player_left'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(result.message || 'Game abandoned successfully');
+        
+        // Reset game state
+        setGamePhase('setup');
+        setBattleshipGame(null);
+        setGameState(null);
+        setEscrowStatus('refunded');
+        
+      } else {
+        toast.error(result.error || 'Failed to abandon game');
+      }
+    } catch (error) {
+      console.error('Error abandoning game:', error);
+      toast.error('Failed to abandon game');
+    } finally {
+      setAbandoning(false);
+    }
+  };
+
+  // Handle join from public lobby
+  const handleJoinPublicGame = (gameId: string) => {
+    setGameIdInput(gameId);
+    setShowPublicLobby(false);
+    
+    // Trigger join game flow
+    if (gameId.trim()) {
+      setGamePhase('placement');
+      toast.success('Joining public game...');
+    }
+  };
+
   // Show wallet connection screen if not connected
   if (!publicKey) {
     return (
@@ -1001,6 +1068,11 @@ const BattleshipGame: React.FC = () => {
 
 
 
+        {/* Wallet Balance Display */}
+        <div className="mb-6">
+          <WalletBalance />
+        </div>
+
         {/* Game setup and sharing section */}
         {gamePhase === 'setup' && (
           <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
@@ -1018,6 +1090,15 @@ const BattleshipGame: React.FC = () => {
                 <ArrowLeft className="w-4 h-4" />
                 Return to Fleet
               </button>
+            </div>
+
+            {/* Wager Input Section */}
+            <div className="mb-8">
+              <WalletBalance 
+                showWagerInput={true}
+                onWagerChange={handleWagerChange}
+                currentWager={wagerAmount}
+              />
             </div>
             
             <div className="grid md:grid-cols-2 gap-8">
@@ -1092,60 +1173,26 @@ const BattleshipGame: React.FC = () => {
               </div>
             </div>
 
-            {/* Public games lobby */}
+            {/* Public Games Lobby */}
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-r from-purple-100 to-purple-200 p-2 rounded-lg">
-                    <Trophy className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-800">Admiral's Harbor</h3>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowPublicLobby(!showPublicLobby);
-                    if (!showPublicLobby) loadPublicGames();
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  <Users className="w-4 h-4" />
-                  {showPublicLobby ? 'Hide Harbor' : 'Open Harbor'}
-                </button>
-              </div>
-
-              {showPublicLobby && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  {loading ? (
-                    <div className="text-center py-4">
-                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-gray-500" />
-                      <p className="text-gray-500 mt-2">Loading public games...</p>
-                    </div>
-                  ) : publicGames.length > 0 ? (
-                    <div className="space-y-2">
-                      {publicGames.map((game) => (
-                        <div
-                          key={game.id}
-                          className="flex justify-between items-center p-3 bg-white rounded border hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            setGameIdInput(game.id);
-                            toast.success('Game selected! Click "Join Game" to continue.');
-                          }}
-                        >
-                          <div>
-                            <p className="font-medium">{game.creatorName || 'Anonymous Captain'}</p>
-                            <p className="text-sm text-gray-500">
-                              Created {new Date(game.createdAt).toLocaleTimeString()}
-                            </p>
-                          </div>
-                          <Gamepad2 className="w-5 h-5 text-blue-500" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-gray-500 py-4">
-                      No public games available. Create one to get started!
-                    </p>
-                  )}
+              {showPublicLobby ? (
+                <PublicGamesLobby 
+                  onJoinGame={handleJoinPublicGame}
+                  className="mt-4"
+                />
+              ) : (
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      setShowPublicLobby(true);
+                      loadPublicGames();
+                    }}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg mx-auto"
+                  >
+                    <Trophy className="w-5 h-5" />
+                    Browse Admiral's Harbor
+                  </button>
+                  <p className="text-gray-600 text-sm mt-2">Discover public battles waiting for challengers</p>
                 </div>
               )}
             </div>
@@ -1358,13 +1405,32 @@ const BattleshipGame: React.FC = () => {
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">⚔️ Battle in Progress!</h2>
                   <p className="text-lg text-gray-600">{getGameStatus(gameState)}</p>
+                  {wagerAmount > 0 && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <DollarSign className="w-4 h-4 text-orange-600" />
+                      <span className="text-orange-600 font-medium">
+                        Stakes: {wagerAmount} GOR • Escrow: {escrowStatus}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
-                <div className="flex gap-3">
+                <div className="flex gap-2 flex-wrap">
+                  {wagerAmount > 0 && (
+                    <button
+                      onClick={abandonGame}
+                      disabled={abandoning}
+                      className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      {abandoning ? 'Abandoning...' : 'Abandon'}
+                    </button>
+                  )}
+                  
                   <button
                     onClick={syncGameState}
                     disabled={syncing}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 text-sm"
                   >
                     <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
                     Sync
@@ -1373,7 +1439,7 @@ const BattleshipGame: React.FC = () => {
                   {battleshipGame && (
                     <button
                       onClick={shareGame}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
                     >
                       <Share2 className="w-4 h-4" />
                       Share

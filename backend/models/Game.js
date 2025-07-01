@@ -166,6 +166,59 @@ const gameSchema = new mongoose.Schema({
     }]
   },
   
+  // Wager and Escrow System
+  wagerAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  
+  escrowStatus: {
+    type: String,
+    enum: ['none', 'pending', 'locked', 'released', 'refunded'],
+    default: 'none'
+  },
+  
+  escrowData: {
+    creatorDeposit: {
+      type: Number,
+      default: 0
+    },
+    opponentDeposit: {
+      type: Number,
+      default: 0
+    },
+    escrowAccount: String,
+    transactionIds: [String],
+    releaseTransaction: String,
+    refundTransactions: [String]
+  },
+  
+  // Game Timeout and Abandonment
+  timeoutAt: {
+    type: Date,
+    default: null
+  },
+  
+  abandonedBy: String,
+  abandonReason: {
+    type: String,
+    enum: ['player_left', 'timeout', 'inactivity', 'mutual', 'system'],
+    default: null
+  },
+  
+  // Player Status
+  playersDeposited: {
+    player1: {
+      type: Boolean,
+      default: false
+    },
+    player2: {
+      type: Boolean,
+      default: false
+    }
+  },
+  
   // Additional Features
   spectators: [{
     id: String,

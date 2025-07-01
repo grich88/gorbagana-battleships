@@ -104,6 +104,38 @@ const BattleshipGame: React.FC = () => {
   const [canAbandon, setCanAbandon] = useState(false);
   const [abandoning, setAbandoning] = useState(false);
 
+  // Initialize from landing page state (localStorage)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const storedGameMode = localStorage.getItem('selectedGameMode') as GameMode;
+    const storedIsPublic = localStorage.getItem('isPublicGame') === 'true';
+    const storedWager = parseFloat(localStorage.getItem('wagerAmount') || '0');
+    const storedGameId = localStorage.getItem('gameIdToJoin');
+    
+    if (storedGameMode && storedGameMode !== selectedGameMode) {
+      setSelectedGameMode(storedGameMode);
+      setIsPublicGame(storedIsPublic);
+      setWagerAmount(storedWager);
+      console.log(`🎮 Restored from landing: ${storedGameMode}, public: ${storedIsPublic}, wager: ${storedWager}`);
+    }
+    
+    if (storedGameId) {
+      setGameIdInput(storedGameId);
+      setShowGameModeSelector(false);
+      console.log(`🔗 Auto-joining game: ${storedGameId.slice(0, 8)}...`);
+      
+      // Clear the stored game ID so it doesn't persist
+      localStorage.removeItem('gameIdToJoin');
+    } else {
+      // Hide game mode selector and go straight to setup if coming from landing
+      if (storedGameMode) {
+        setShowGameModeSelector(false);
+        setGamePhase('setup');
+      }
+    }
+  }, []);
+
   // Initialize game mode on component mount
   useEffect(() => {
     if (playerBoard.length === 0 && shipsToPlace.length === 0) {

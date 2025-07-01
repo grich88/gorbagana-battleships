@@ -166,6 +166,18 @@ body {
   color: white !important;
 }
 
+/* Hero wallet button styling */
+.wallet-button-hero {
+  display: block !important;
+  margin: 0 auto !important;
+  box-shadow: 0 10px 25px -5px rgba(3, 105, 161, 0.2), 0 10px 10px -5px rgba(3, 105, 161, 0.1) !important;
+}
+
+.wallet-button-hero:hover {
+  transform: translateY(-3px) scale(1.02) !important;
+  box-shadow: 0 20px 40px -10px rgba(3, 105, 161, 0.3), 0 15px 20px -5px rgba(3, 105, 161, 0.15) !important;
+}
+
 /* Custom wave animation for loading states */
 @keyframes wave {
   0%, 100% { transform: translateY(0px); }

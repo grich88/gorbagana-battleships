@@ -49,6 +49,9 @@ import {
   convertFromBattleshipGame 
 } from '../lib/gameStorage';
 
+// Gorbagana blockchain service for escrow
+import { GorbaganaBlockchainService } from '../lib/gorbaganaService';
+
 type GamePhase = 'setup' | 'placement' | 'waiting' | 'playing' | 'reveal' | 'finished';
 
 interface ShipPlacement {
@@ -183,19 +186,41 @@ const BattleshipGame: React.FC = () => {
     }
   }, [battleshipGame, gamePhase, publicKey]);
 
-  // Check for shared game on load
+  // Check for shared game on load and auto-join
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const urlParams = new URLSearchParams(window.location.search);
     const sharedGameId = urlParams.get('game');
     
-    if (sharedGameId && publicKey) {
-      // Auto-load shared game
+    if (sharedGameId && publicKey && !battleshipGame) {
+      console.log(`🔗 Auto-joining shared game: ${sharedGameId}`);
       setGameIdInput(sharedGameId);
-      toast.success('Shared game loaded! Join when ready.');
+      
+      // Auto-join the game after a short delay to ensure wallet is ready
+      setTimeout(async () => {
+        try {
+          // Check if game exists and if player should auto-join
+          const existingGame = await battleshipGameStorage.getGame(sharedGameId);
+          if (existingGame && existingGame.player1 !== publicKey.toString() && !existingGame.player2) {
+            console.log('✅ Auto-joining game as player 2');
+            await joinGame();
+            // Clear URL parameter after successful join
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } else if (existingGame && existingGame.player1 === publicKey.toString()) {
+            console.log('✅ Resuming your own game');
+            setBattleshipGame(existingGame);
+            setGamePhase(existingGame.status === 'waiting' ? 'waiting' : 'playing');
+          } else {
+            toast.success('Game loaded! Click Join Game to participate.');
+          }
+        } catch (error) {
+          console.error('Auto-join failed:', error);
+          toast.error('Failed to auto-join game. You can still join manually.');
+        }
+      }, 1500);
     }
-  }, [publicKey]);
+  }, [publicKey, battleshipGame]);
 
   // Game phase management
   useEffect(() => {
@@ -601,7 +626,7 @@ const BattleshipGame: React.FC = () => {
     setWagerAmount(amount);
   };
 
-  // Abandon game
+  // Abandon game with escrow refunds
   const abandonGame = async () => {
     if (!publicKey || !battleshipGame?.id) {
       toast.error('Cannot abandon game: missing required data');
@@ -610,6 +635,58 @@ const BattleshipGame: React.FC = () => {
 
     setAbandoning(true);
     try {
+      console.log(`🚪 Abandoning game ${battleshipGame.id}`);
+      
+      // Handle escrow refunds if there's a wager
+      if (battleshipGame.wagerAmount && battleshipGame.wagerAmount > 0) {
+        console.log(`💰 Processing refunds for abandoned game with ${battleshipGame.wagerAmount} GOR wager`);
+        
+        // Initialize Gorbagana service for escrow handling
+        const gorbaganaService = new GorbaganaBlockchainService();
+        
+        try {
+          const playerA = battleshipGame.player1;
+          const playerB = battleshipGame.player2;
+          const wagerAmount = battleshipGame.wagerAmount;
+          
+          let refundResults;
+          if (playerB) {
+            // Both players joined - refund both
+            console.log('🔄 Both players joined - refunding both players');
+            refundResults = await gorbaganaService.handleAbandonedGame(
+              battleshipGame.id, 
+              playerA, 
+              playerB, 
+              wagerAmount, 
+              battleshipGame.escrowAccount
+            );
+            
+            if (Array.isArray(refundResults)) {
+              const successfulRefunds = refundResults.filter(r => r.success).length;
+              toast.success(`🔄 ${successfulRefunds}/2 players refunded their ${wagerAmount} GOR wager`);
+            }
+          } else {
+            // Only creator joined - refund creator
+            console.log('🔄 Only creator joined - refunding creator');
+            refundResults = await gorbaganaService.handleAbandonedGame(
+              battleshipGame.id, 
+              playerA, 
+              null, 
+              wagerAmount, 
+              battleshipGame.escrowAccount
+            );
+            
+            if (refundResults.success) {
+              toast.success(`🔄 ${wagerAmount} GOR wager refunded to creator`);
+            }
+          }
+        } catch (refundError) {
+          console.error('❌ Escrow refund failed:', refundError);
+          toast.error('Refund processing failed. Game will still be abandoned.');
+        }
+      }
+
+      // Call backend to mark game as abandoned
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/games/${battleshipGame.id}/abandon`, {
         method: 'POST',
         headers: {

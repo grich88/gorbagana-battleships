@@ -108,6 +108,48 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-blue-100">
+      {/* Floating Wallet Status - Always Visible */}
+      <div className="fixed top-4 right-4 z-50">
+        {!publicKey ? (
+          <div className="relative">
+            <div className="bg-white rounded-full shadow-xl border-2 border-blue-200 p-1">
+              <WalletMultiButton 
+                style={{
+                  background: 'linear-gradient(to right, #2563eb, #0d9488)',
+                  color: 'white',
+                  borderRadius: '50px',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  boxShadow: 'none'
+                }}
+              />
+            </div>
+            <div className="absolute -bottom-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center animate-pulse">
+              !
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-full shadow-xl border-2 border-green-200 p-1">
+            <div className="flex items-center gap-2 px-4 py-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-green-700 font-semibold text-sm">Connected</span>
+              <WalletMultiButton 
+                style={{
+                  background: 'transparent',
+                  color: '#059669',
+                  border: 'none',
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.5rem',
+                  boxShadow: 'none'
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-teal-600/20"></div>
@@ -149,31 +191,44 @@ const LandingPage: React.FC = () => {
             </div>
 
             {/* Primary CTA Section */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/50 p-8 mb-16">
+            <div className="bg-white rounded-2xl shadow-2xl border-2 border-blue-200 p-8 mb-16">
               {!publicKey ? (
                 <div className="text-center">
-                  <h2 className="text-3xl font-bold text-gray-800 mb-4">Ready to Command Your Fleet?</h2>
-                  <p className="text-gray-600 mb-8 text-lg">
-                    Connect your wallet to start playing blockchain battleship instantly!
+                  <div className="bg-gradient-to-r from-blue-100 to-teal-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Ship className="w-12 h-12 text-blue-600" />
+                  </div>
+                  
+                  <h2 className="text-4xl font-bold text-gray-800 mb-4">⚓ Ready to Command Your Fleet?</h2>
+                  <p className="text-gray-600 mb-8 text-xl leading-relaxed">
+                    Connect your <strong>Backpack wallet</strong> to start playing blockchain battleship instantly!<br />
+                    <span className="text-blue-600 font-semibold">No wallet? No problem - we'll guide you through setup!</span>
                   </p>
                   
-                  <WalletMultiButton 
-                    style={{
-                      background: 'linear-gradient(to right, #2563eb, #0d9488)',
-                      width: '100%',
-                      maxWidth: '400px',
-                      height: '4rem',
-                      borderRadius: '1rem',
-                      fontWeight: '700',
-                      fontSize: '1.25rem',
-                      border: 'none',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                      transition: 'all 0.3s ease-in-out'
-                    }}
-                    className="wallet-button-hero mx-auto"
-                  />
+                  <div className="space-y-4">
+                    <WalletMultiButton 
+                      style={{
+                        background: 'linear-gradient(to right, #2563eb, #0d9488)',
+                        width: '100%',
+                        maxWidth: '500px',
+                        height: '4.5rem',
+                        borderRadius: '1.25rem',
+                        fontWeight: '700',
+                        fontSize: '1.5rem',
+                        border: '3px solid #ffffff',
+                        boxShadow: '0 15px 35px -5px rgba(0, 0, 0, 0.2), 0 10px 15px -5px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.3s ease-in-out',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px'
+                      }}
+                      className="wallet-button-hero mx-auto block"
+                    />
+                    
+                    <p className="text-sm text-gray-500 max-w-md mx-auto">
+                      🔐 <strong>Secure</strong> • ⚡ <strong>Fast</strong> • 🎮 <strong>Ready in 30 seconds</strong>
+                    </p>
+                  </div>
                   
-                  <div className="mt-6">
+                  <div className="mt-8">
                     <GorbaganaFaucet variant="card" />
                   </div>
                 </div>
@@ -335,16 +390,23 @@ const LandingPage: React.FC = () => {
                   <ArrowRight className="w-5 h-5" />
                 </button>
               ) : (
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600 mb-3">Connect wallet to deploy your fleet</p>
+                <div className="text-center p-6 bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 rounded-xl">
+                  <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Ship className="w-6 h-6 text-red-600" />
+                  </div>
+                  <p className="text-red-800 font-semibold mb-3">⚠️ Wallet Required</p>
+                  <p className="text-red-600 mb-4 text-sm">Connect your Backpack wallet to deploy your fleet</p>
                   <WalletMultiButton 
                     style={{
-                      background: 'linear-gradient(to right, #2563eb, #0d9488)',
+                      background: 'linear-gradient(to right, #dc2626, #ea580c)',
+                      color: 'white',
                       width: '100%',
                       height: '3rem',
                       borderRadius: '0.75rem',
-                      fontWeight: '600',
-                      border: 'none'
+                      fontWeight: '700',
+                      border: 'none',
+                      fontSize: '1rem',
+                      textTransform: 'uppercase'
                     }}
                   />
                 </div>
@@ -382,16 +444,23 @@ const LandingPage: React.FC = () => {
                   <ArrowRight className="w-5 h-5" />
                 </button>
               ) : (
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600 mb-3">Connect wallet to join battles</p>
+                <div className="text-center p-6 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl">
+                  <div className="bg-yellow-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Users className="w-6 h-6 text-yellow-600" />
+                  </div>
+                  <p className="text-yellow-800 font-semibold mb-3">🔗 Connect to Join</p>
+                  <p className="text-yellow-600 mb-4 text-sm">Connect your Backpack wallet to join battles</p>
                   <WalletMultiButton 
                     style={{
-                      background: 'linear-gradient(to right, #0d9488, #2563eb)',
+                      background: 'linear-gradient(to right, #eab308, #f59e0b)',
+                      color: 'white',
                       width: '100%',
                       height: '3rem',
                       borderRadius: '0.75rem',
-                      fontWeight: '600',
-                      border: 'none'
+                      fontWeight: '700',
+                      border: 'none',
+                      fontSize: '1rem',
+                      textTransform: 'uppercase'
                     }}
                   />
                 </div>

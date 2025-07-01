@@ -288,6 +288,35 @@ app.get('/api/games/:gameId', async (req, res) => {
       game = await Game.findOne({ id: gameId });
       if (game) {
         game = game.toObject();
+        
+        // Convert MongoDB format back to frontend format
+        const frontendGame = {
+          id: game.id,
+          player1: game.player1?.walletAddress || game.player1?.id || '',
+          player2: game.player2?.walletAddress || game.player2?.id || undefined,
+          player1Board: game.player1Board || new Array(100).fill(0),
+          player2Board: game.player2Board || undefined,
+          player1Salt: game.player1Salt || [],
+          player2Salt: game.player2Salt || undefined,
+          player1Commitment: game.player1Commitment || [],
+          player2Commitment: game.player2Commitment || [],
+          turn: game.gameState?.turn || game.turn || 1,
+          boardHits1: game.boardHits1 || new Array(100).fill(0),
+          boardHits2: game.boardHits2 || new Array(100).fill(0),
+          status: game.status || game.gameState?.phase || 'waiting',
+          winner: game.winner || (game.gameState?.winner ? parseInt(game.gameState.winner.replace('player', '')) : undefined),
+          createdAt: game.createdAt?.getTime() || Date.now(),
+          updatedAt: game.updatedAt?.getTime() || Date.now(),
+          isPublic: game.isPublic || false,
+          creatorName: game.creator?.name || game.player1?.name || 'Anonymous Captain',
+          wager: game.wagerAmount || game.wager || 0,
+          escrowAccount: game.escrowData?.escrowAccount || game.escrowAccount,
+          txSignature: game.txSignature,
+          phase: game.gameState?.phase || game.phase || 'setup'
+        };
+        
+        console.log(`📖 Game retrieved: ${gameId.slice(0, 8)}... (MongoDB)`);
+        return res.json(sanitizeGame(frontendGame));
       }
     } else {
       game = inMemoryGames.get(gameId);
@@ -298,7 +327,7 @@ app.get('/api/games/:gameId', async (req, res) => {
       return res.status(404).json({ error: 'Game not found' });
     }
     
-    console.log(`📖 Game retrieved: ${gameId.slice(0, 8)}... (${mongoConnected ? 'MongoDB' : 'Memory'})`);
+    console.log(`📖 Game retrieved: ${gameId.slice(0, 8)}... (Memory)`);
     res.json(sanitizeGame(game));
   } catch (error) {
     console.error('❌ Error fetching game:', error);
@@ -312,44 +341,59 @@ app.post('/api/games', async (req, res) => {
     const gameData = req.body;
     
     // Validate required fields
-    if (!gameData.id || !gameData.player1) {
-      return res.status(400).json({ error: 'Missing required fields: id, player1' });
+    if (!gameData.id) {
+      return res.status(400).json({ error: 'Missing required field: id' });
+    }
+
+    // Check if this is the new MongoDB-compatible format
+    if (gameData.player1 && typeof gameData.player1 === 'object' && gameData.gameState) {
+      // New format from frontend - use as-is for MongoDB
+      gameData.updatedAt = new Date();
+      
+      if (mongoConnected) {
+        try {
+          await Game.findOneAndUpdate(
+            { id: gameData.id },
+            gameData,
+            { 
+              upsert: true, 
+              new: true,
+              setDefaultsOnInsert: true
+            }
+          );
+          console.log(`💾 Game saved to MongoDB: ${gameData.id.slice(0, 8)}...`);
+          return res.json({ success: true, gameId: gameData.id });
+        } catch (mongoError) {
+          console.error('❌ MongoDB save failed:', mongoError);
+          // Fall through to in-memory storage
+        }
+      }
+    }
+    
+    // Legacy format or fallback to in-memory storage
+    if (!gameData.player1) {
+      return res.status(400).json({ error: 'Missing required field: player1' });
     }
     
     const game = deserializeGame(gameData);
-    game.updatedAt = new Date();
+    game.updatedAt = Date.now();
     
-    if (mongoConnected) {
-      // MongoDB save
-      await Game.findOneAndUpdate(
-        { id: game.id },
-        game,
-        { 
-          upsert: true, 
-          new: true,
-          setDefaultsOnInsert: true
-        }
-      );
-      console.log(`💾 Game saved to MongoDB: ${game.id.slice(0, 8)}...`);
-    } else {
-      // In-memory fallback
-      game.updatedAt = Date.now();
-      inMemoryGames.set(game.id, game);
-      
-      // Add to history for analytics
-      gameHistory.push({
-        gameId: game.id,
-        action: inMemoryGames.has(game.id) ? 'updated' : 'created',
-        timestamp: Date.now(),
-        status: game.status,
-        isPublic: game.isPublic,
-      });
-      
-      if (gameHistory.length > 1000) {
-        gameHistory.splice(0, gameHistory.length - 1000);
-      }
-      console.log(`💾 Game saved to memory: ${game.id.slice(0, 8)}...`);
+    // In-memory fallback
+    inMemoryGames.set(game.id, game);
+    
+    // Add to history for analytics
+    gameHistory.push({
+      gameId: game.id,
+      action: inMemoryGames.has(game.id) ? 'updated' : 'created',
+      timestamp: Date.now(),
+      status: game.status,
+      isPublic: game.isPublic,
+    });
+    
+    if (gameHistory.length > 1000) {
+      gameHistory.splice(0, gameHistory.length - 1000);
     }
+    console.log(`💾 Game saved to memory: ${game.id.slice(0, 8)}...`);
     
     res.json({ success: true, gameId: game.id });
   } catch (error) {

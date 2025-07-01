@@ -169,14 +169,56 @@ class BattleshipGameStorage {
     return this.saveToLocalStorage(game)
   }
 
-  // Save to backend API
+  // Save to backend API with proper MongoDB format
   private async saveToBackend(game: BattleshipGame): Promise<boolean> {
     try {
-      // Convert Uint8Array to regular arrays for JSON serialization
+      // Convert game data to MongoDB-compatible format
       const gameForBackend = {
-        ...game,
+        id: game.id,
+        gameMode: {
+          mode: 'standard',
+          boardSize: 10,
+          totalShipSquares: 17
+        },
+        player1: {
+          id: game.player1,
+          name: game.creatorName || 'Anonymous Captain',
+          walletAddress: game.player1,
+          joined: true,
+          ready: true
+        },
+        player2: game.player2 ? {
+          id: game.player2,
+          name: 'Anonymous Captain',
+          walletAddress: game.player2,
+          joined: true,
+          ready: false
+        } : undefined,
+        gameState: {
+          phase: game.phase || 'setup',
+          turn: game.turn || 1,
+          currentPlayer: 'player1',
+          winner: game.winner ? `player${game.winner}` : null
+        },
+        isPublic: game.isPublic || false,
+        creator: {
+          id: game.player1,
+          name: game.creatorName || 'Anonymous Captain',
+          walletAddress: game.player1
+        },
+        wagerAmount: game.wager || 0,
+        escrowStatus: 'none',
         player1Salt: Array.from(game.player1Salt),
         player2Salt: game.player2Salt ? Array.from(game.player2Salt) : undefined,
+        player1Board: game.player1Board,
+        player2Board: game.player2Board,
+        player1Commitment: game.player1Commitment,
+        player2Commitment: game.player2Commitment,
+        boardHits1: game.boardHits1,
+        boardHits2: game.boardHits2,
+        status: game.status,
+        createdAt: new Date(game.createdAt),
+        updatedAt: new Date()
       }
 
       const response = await fetch(`${API_BASE_URL}/api/games`, {
@@ -275,6 +317,11 @@ class BattleshipGameStorage {
 
     // Fallback to localStorage
     return this.getFromLocalStorage(gameId)
+  }
+
+  // Alias for getGame to match interface expected by frontend
+  async loadGame(gameId: string): Promise<BattleshipGame | null> {
+    return this.getGame(gameId)
   }
 
   // Get from backend API

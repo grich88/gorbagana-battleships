@@ -2,6 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles for wallet buttons */
+.wallet-button-custom {
+  position: relative;
+}
+
+.wallet-button-custom img,
+.wallet-button-custom svg {
+  width: 20px !important;
+  height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+}
+
+.wallet-adapter-button img,
+.wallet-adapter-button svg {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+}
+
+/* Specific styling for Backpack wallet icons */
+button[data-wallet-name*="Backpack"] img,
+button[data-wallet-name*="Backpack"] svg,
+.wallet-adapter-button-start-icon img,
+.wallet-adapter-button-start-icon svg {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+}
+
+/* Additional wallet button customizations */
+.wallet-adapter-dropdown-list {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.wallet-adapter-dropdown-list-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 2px;
+}
+
+.wallet-adapter-dropdown-list-item:hover {
+  background-color: #f3f4f6;
+}
+
 /* Custom maritime theme colors and animations */
 :root {
   --ocean-blue: #0369a1;

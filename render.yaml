@@ -12,10 +12,7 @@ services:
       - key: PORT
         value: 3002
       - key: CORS_ORIGIN
-        fromService:
-          name: gorbagana-battleship-frontend
-          type: web
-          property: url
+        value: https://gorbagana-battleship-frontend.onrender.com
       - key: MONGODB_URI
         sync: false  # Set manually in Render dashboard
     healthCheckPath: /health
@@ -32,10 +29,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          name: gorbagana-battleship-backend
-          type: web
-          property: url
+        value: https://gorbagana-battleship-backend.onrender.com
       - key: NEXT_PUBLIC_RPC_PRIMARY
         value: https://rpc.gorbagana.wtf/
       - key: NEXT_PUBLIC_RPC_SECONDARY  

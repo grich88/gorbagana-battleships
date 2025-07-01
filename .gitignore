@@ -104,6 +104,7 @@ temp/
 target/
 !target/idl/
 !target/types/
+!frontend/target/idl/
 
 # Local development
 .env.local

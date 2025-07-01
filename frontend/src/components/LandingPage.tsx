@@ -17,14 +17,61 @@ import WalletBalance from './WalletBalance';
 import PublicGamesLobby from './PublicGamesLobby';
 import { GAME_MODES, GameMode } from '../lib/battleshipUtils';
 
+// Simple wallet connect fallback component
+const SimpleWalletButton: React.FC<{ style?: React.CSSProperties; className?: string }> = ({ style, className }) => {
+  const { connect, wallet, wallets, select } = useWallet();
+  
+  const handleConnect = async () => {
+    try {
+      // Try to select Backpack wallet first
+      const backpackWallet = wallets.find(w => w.adapter.name.toLowerCase().includes('backpack'));
+      if (backpackWallet) {
+        select(backpackWallet.adapter.name);
+        await connect();
+        toast.success('🎉 Wallet connected successfully!');
+      } else {
+        // Fallback to first available wallet
+        if (wallets[0]) {
+          select(wallets[0].adapter.name);
+          await connect();
+          toast.success('🎉 Wallet connected successfully!');
+        } else {
+          toast.error('❌ No wallets found! Please install Backpack wallet.');
+        }
+      }
+    } catch (error: any) {
+      console.error('Wallet connection error:', error);
+      toast.error(`❌ Connection failed: ${error.message}`);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleConnect}
+      style={style}
+      className={`wallet-fallback-button ${className || ''}`}
+    >
+      🔗 Connect Wallet
+    </button>
+  );
+};
+
 const LandingPage: React.FC = () => {
-  const { publicKey } = useWallet();
+  const { publicKey, connected, connecting, disconnecting } = useWallet();
   const [showFullGame, setShowFullGame] = useState(false);
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>('standard');
   const [gameIdInput, setGameIdInput] = useState('');
   const [isPublicGame, setIsPublicGame] = useState(true);
   const [showPublicLobby, setShowPublicLobby] = useState(false);
   const [wagerAmount, setWagerAmount] = useState<number>(0);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  // Debug wallet state
+  useEffect(() => {
+    const info = `Connected: ${connected}, Connecting: ${connecting}, PublicKey: ${publicKey ? 'Yes' : 'No'}`;
+    setDebugInfo(info);
+    console.log('🔍 Wallet Debug Info:', info);
+  }, [connected, connecting, publicKey]);
 
   // Auto-detect shared games from URL
   useEffect(() => {
@@ -110,19 +157,35 @@ const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-blue-100">
       {/* SUPER VISIBLE WALLET BUTTON DEBUG - TOP */}
       <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-500 text-white text-center py-2 px-4">
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-4 flex-wrap">
           <span className="font-bold">🔥 WALLET STATUS: {publicKey ? '✅ CONNECTED' : '❌ NOT CONNECTED'}</span>
-          <WalletMultiButton 
-            style={{
-              background: '#1f2937',
-              color: 'white',
-              border: '2px solid white',
-              borderRadius: '8px',
-              padding: '8px 16px',
-              fontWeight: 'bold',
-              fontSize: '14px'
-            }}
-          />
+          <span className="text-sm">{debugInfo}</span>
+          
+          {/* Both buttons for comparison */}
+          <div className="flex gap-2">
+            <WalletMultiButton 
+              style={{
+                background: '#1f2937',
+                color: 'white',
+                border: '2px solid white',
+                borderRadius: '8px',
+                padding: '8px 16px',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              }}
+            />
+            <SimpleWalletButton
+              style={{
+                background: '#059669',
+                color: 'white',
+                border: '2px solid white',
+                borderRadius: '8px',
+                padding: '8px 16px',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -131,7 +194,7 @@ const LandingPage: React.FC = () => {
         {!publicKey ? (
           <div className="relative">
             <div className="bg-white rounded-full shadow-xl border-2 border-blue-200 p-1">
-              <WalletMultiButton 
+              <SimpleWalletButton
                 style={{
                   background: 'linear-gradient(to right, #2563eb, #0d9488)',
                   color: 'white',
@@ -143,9 +206,9 @@ const LandingPage: React.FC = () => {
                   boxShadow: 'none',
                   minWidth: '200px',
                   minHeight: '50px',
-                  display: 'flex !important',
-                  visibility: 'visible !important',
-                  opacity: '1 !important'
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               />
             </div>
@@ -228,10 +291,10 @@ const LandingPage: React.FC = () => {
                   </p>
                   
                   <div className="space-y-4">
-                    {/* SUPER VISIBLE MAIN WALLET BUTTON */}
-                    <div className="bg-gradient-to-r from-red-500 to-pink-500 p-4 rounded-2xl mb-4">
-                      <div className="text-white text-xl font-bold mb-2">🔥 CONNECT WALLET BUTTON BELOW 🔥</div>
-                      <WalletMultiButton 
+                    {/* WORKING WALLET BUTTON */}
+                    <div className="bg-gradient-to-r from-green-500 to-blue-500 p-4 rounded-2xl mb-4">
+                      <div className="text-white text-xl font-bold mb-4">✅ WORKING CONNECT WALLET BUTTON:</div>
+                      <SimpleWalletButton
                         style={{
                           background: 'linear-gradient(to right, #2563eb, #0d9488)',
                           width: '100%',
@@ -247,13 +310,13 @@ const LandingPage: React.FC = () => {
                           letterSpacing: '1px',
                           minWidth: '300px',
                           minHeight: '70px',
-                          display: 'flex !important',
-                          visibility: 'visible !important',
-                          opacity: '1 !important',
-                          position: 'relative !important',
-                          zIndex: '100 !important'
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          cursor: 'pointer'
                         }}
-                        className="wallet-button-hero mx-auto block"
+                        className="mx-auto block"
                       />
                     </div>
                     

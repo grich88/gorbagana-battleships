@@ -108,8 +108,26 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-blue-100">
+      {/* SUPER VISIBLE WALLET BUTTON DEBUG - TOP */}
+      <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-500 text-white text-center py-2 px-4">
+        <div className="flex items-center justify-center gap-4">
+          <span className="font-bold">🔥 WALLET STATUS: {publicKey ? '✅ CONNECTED' : '❌ NOT CONNECTED'}</span>
+          <WalletMultiButton 
+            style={{
+              background: '#1f2937',
+              color: 'white',
+              border: '2px solid white',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}
+          />
+        </div>
+      </div>
+
       {/* Floating Wallet Status - Always Visible */}
-      <div className="fixed top-4 right-4 z-50">
+      <div className="fixed top-16 right-4 z-50">
         {!publicKey ? (
           <div className="relative">
             <div className="bg-white rounded-full shadow-xl border-2 border-blue-200 p-1">
@@ -122,7 +140,12 @@ const LandingPage: React.FC = () => {
                   fontSize: '0.875rem',
                   border: 'none',
                   padding: '0.75rem 1.5rem',
-                  boxShadow: 'none'
+                  boxShadow: 'none',
+                  minWidth: '200px',
+                  minHeight: '50px',
+                  display: 'flex !important',
+                  visibility: 'visible !important',
+                  opacity: '1 !important'
                 }}
               />
             </div>
@@ -151,7 +174,7 @@ const LandingPage: React.FC = () => {
       </div>
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden">
+      <div className="relative overflow-hidden pt-16">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-teal-600/20"></div>
         <div className="relative container mx-auto px-4 py-16">
           <div className="text-center max-w-4xl mx-auto">
@@ -205,23 +228,34 @@ const LandingPage: React.FC = () => {
                   </p>
                   
                   <div className="space-y-4">
-                    <WalletMultiButton 
-                      style={{
-                        background: 'linear-gradient(to right, #2563eb, #0d9488)',
-                        width: '100%',
-                        maxWidth: '500px',
-                        height: '4.5rem',
-                        borderRadius: '1.25rem',
-                        fontWeight: '700',
-                        fontSize: '1.5rem',
-                        border: '3px solid #ffffff',
-                        boxShadow: '0 15px 35px -5px rgba(0, 0, 0, 0.2), 0 10px 15px -5px rgba(0, 0, 0, 0.1)',
-                        transition: 'all 0.3s ease-in-out',
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px'
-                      }}
-                      className="wallet-button-hero mx-auto block"
-                    />
+                    {/* SUPER VISIBLE MAIN WALLET BUTTON */}
+                    <div className="bg-gradient-to-r from-red-500 to-pink-500 p-4 rounded-2xl mb-4">
+                      <div className="text-white text-xl font-bold mb-2">🔥 CONNECT WALLET BUTTON BELOW 🔥</div>
+                      <WalletMultiButton 
+                        style={{
+                          background: 'linear-gradient(to right, #2563eb, #0d9488)',
+                          width: '100%',
+                          maxWidth: '500px',
+                          height: '4.5rem',
+                          borderRadius: '1.25rem',
+                          fontWeight: '700',
+                          fontSize: '1.5rem',
+                          border: '3px solid #ffffff',
+                          boxShadow: '0 15px 35px -5px rgba(0, 0, 0, 0.2), 0 10px 15px -5px rgba(0, 0, 0, 0.1)',
+                          transition: 'all 0.3s ease-in-out',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px',
+                          minWidth: '300px',
+                          minHeight: '70px',
+                          display: 'flex !important',
+                          visibility: 'visible !important',
+                          opacity: '1 !important',
+                          position: 'relative !important',
+                          zIndex: '100 !important'
+                        }}
+                        className="wallet-button-hero mx-auto block"
+                      />
+                    </div>
                     
                     <p className="text-sm text-gray-500 max-w-md mx-auto">
                       🔐 <strong>Secure</strong> • ⚡ <strong>Fast</strong> • 🎮 <strong>Ready in 30 seconds</strong>

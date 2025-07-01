@@ -7,10 +7,11 @@ import { PublicKey, SystemProgram } from '@solana/web3.js';
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
-import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft } from 'lucide-react';
+import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Anchor, Settings, Trophy, Waves, Compass, Target, Ship } from 'lucide-react';
 
 import GameBoard from './GameBoard';
 import GorbaganaFaucet from './GorbaganaFaucet';
+import GorbaganaInfo from './GorbaganaInfo';
 import {
   STANDARD_FLEET,
   TOTAL_SHIP_SQUARES,
@@ -799,17 +800,83 @@ const BattleshipGame: React.FC = () => {
     }
   };
 
-  if (!wallet) {
+  // Show wallet connection screen if not connected
+  if (!publicKey) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <div className="max-w-md w-full space-y-6">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">⚓ Battleship on Gorbagana</h1>
-            <p className="text-gray-600 mb-8">Connect your Backpack wallet to start playing</p>
-            <WalletMultiButton />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-blue-100 py-8">
+        <div className="container mx-auto px-4 max-w-4xl">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="bg-gradient-to-r from-blue-600 to-teal-600 p-3 rounded-full">
+                <Anchor className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">
+                Gorbagana Battleship
+              </h1>
+            </div>
+            <p className="text-gray-600 text-lg">
+              Engage in strategic naval warfare on the Gorbagana blockchain
+            </p>
+            
+            {/* Quick Stats */}
+            <div className="flex items-center justify-center gap-6 mt-6 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <Waves className="w-4 h-4 text-blue-600" />
+                <span>Lightning Fast</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-teal-600" />
+                <span>Cross-Device</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-green-600" />
+                <span>Real-time</span>
+              </div>
+            </div>
           </div>
-          
-          <GorbaganaFaucet variant="card" />
+
+          {/* Gorbagana Info */}
+          <div className="mb-8">
+            <GorbaganaInfo variant="full" />
+          </div>
+
+          {/* Wallet Connection Card */}
+          <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 text-center">
+            <div className="bg-gradient-to-r from-blue-100 to-teal-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Ship className="w-10 h-10 text-blue-600" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Ready to Command Your Fleet?</h2>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              Connect your wallet to start playing blockchain battleship. Deploy your ships, 
+              engage in battles, and dominate the seas!
+            </p>
+            
+            <div className="space-y-4">
+              <WalletMultiButton 
+                style={{
+                  background: 'linear-gradient(to right, #2563eb, #0d9488)',
+                  width: '100%',
+                  height: '3.5rem',
+                  borderRadius: '0.5rem',
+                  fontWeight: '600',
+                  fontSize: '1rem',
+                  border: 'none',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  transition: 'all 0.2s ease-in-out'
+                }}
+              />
+
+              {/* Faucet Card */}
+              <GorbaganaFaucet variant="card" />
+            </div>
+          </div>
+
+          {/* Bottom Info */}
+          <div className="mt-8 text-center text-sm text-gray-500">
+            <p>Powered by Gorbagana Network • Secure • Fast • Fun</p>
+          </div>
         </div>
       </div>
     );
@@ -870,93 +937,137 @@ const BattleshipGame: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header with status indicators */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                ⚓ Battleship on Gorbagana
-              </h1>
-              <p className="text-gray-600">
-                Blockchain-powered naval warfare • Phase: <span className="font-semibold text-blue-600">{gamePhase}</span>
-              </p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-blue-100 py-4">
+      <div className="container mx-auto px-4 max-w-7xl">
+        {/* Enhanced Header */}
+        <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-6 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Title Section */}
+            <div className="flex items-center gap-4">
+              <div className="bg-gradient-to-r from-blue-600 to-teal-600 p-3 rounded-full">
+                <Anchor className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">
+                  Gorbagana Battleship
+                </h1>
+                <p className="text-gray-600 text-sm">Strategic naval warfare on the blockchain</p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <GorbaganaFaucet variant="inline" />
+              
+              <WalletMultiButton 
+                style={{
+                  background: 'linear-gradient(to right, #f3f4f6, #e5e7eb)',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                  padding: '0.5rem 1rem',
+                  transition: 'all 0.2s ease-in-out'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Wallet Info Bar */}
+          <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 text-sm">
+            <div className="flex items-center gap-4 text-gray-600">
+              <span className="font-medium">Fleet Admiral:</span>
+              <code className="bg-blue-50 px-2 py-1 rounded text-blue-700 border border-blue-200">
+                {publicKey?.toString().slice(0, 8)}...{publicKey?.toString().slice(-8)}
+              </code>
             </div>
             
-            {/* Status indicators */}
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${backendStatus.available ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className="text-sm text-gray-600">
-                  Backend: {backendStatus.available ? 'Connected' : 'Offline'}
-                </span>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-gray-600 text-xs">Gorbagana Network</span>
               </div>
-              
-              {syncing && (
-                <div className="flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
-                  <span className="text-sm text-blue-600">Syncing...</span>
-                </div>
-              )}
-              
-              <GorbaganaFaucet variant="inline" />
-              <WalletMultiButton />
+              <span className="text-gray-400">|</span>
+              <span className="text-gray-600 text-xs">Ready for battle</span>
             </div>
           </div>
         </div>
 
+        {/* Compact Gorbagana Info */}
+        <div className="mb-6">
+          <GorbaganaInfo variant="compact" />
+        </div>
+
+
+
         {/* Game setup and sharing section */}
         {gamePhase === 'setup' && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">🚢 Game Setup</h2>
+          <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-r from-blue-100 to-teal-100 p-3 rounded-full">
+                  <Ship className="w-6 h-6 text-blue-600" />
+                </div>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">Fleet Command Center</h2>
+              </div>
               <button
                 onClick={() => setGamePhase('placement')}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back to Ship Placement
+                Return to Fleet
               </button>
             </div>
             
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-8">
               {/* Create new game */}
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold text-gray-700">Create New Game</h3>
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-r from-blue-100 to-blue-200 p-2 rounded-lg">
+                    <Anchor className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-800">Launch New Battle</h3>
+                </div>
                 
-                <div className="space-y-3">
-                  <label className="flex items-center space-x-2">
+                <div className="space-y-4">
+                  <label className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer">
                     <input
                       type="checkbox"
                       checked={isPublicGame}
                       onChange={(e) => setIsPublicGame(e.target.checked)}
-                      className="rounded"
+                      className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                     />
-                    <span className="text-gray-700">Make game public (others can find and join)</span>
+                    <span className="text-gray-700 font-medium">Public Battle (allow others to join)</span>
                   </label>
                   
                   <button
                     onClick={() => setGamePhase('placement')}
                     disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Start Ship Placement ⚓
+                    <Anchor className="w-5 h-5" />
+                    Deploy Fleet
                   </button>
                 </div>
               </div>
 
               {/* Join existing game */}
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold text-gray-700">Join Existing Game</h3>
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-r from-teal-100 to-teal-200 p-2 rounded-lg">
+                    <Users className="w-5 h-5 text-teal-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-800">Join Fleet</h3>
+                </div>
                 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <input
                     type="text"
-                    placeholder="Enter Game ID or paste shared link"
+                    placeholder="Enter Battle ID or paste invitation link"
                     value={gameIdInput}
                     onChange={(e) => setGameIdInput(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200"
                   />
                   
                   <button
@@ -964,35 +1075,41 @@ const BattleshipGame: React.FC = () => {
                       if (gameIdInput.trim()) {
                         setGamePhase('placement');
                       } else {
-                        toast.error('Please enter a Game ID');
+                        toast.error('Please enter a Battle ID');
                       }
                     }}
                     disabled={loading || !gameIdInput.trim()}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+                    className="w-full bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Join Game 🤝
+                    <Users className="w-5 h-5" />
+                    Join Battle
                   </button>
                 </div>
                 
-                <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="mt-6 pt-4 border-t border-gray-200">
                   <GorbaganaFaucet variant="inline" className="justify-center" />
                 </div>
               </div>
             </div>
 
             {/* Public games lobby */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold text-gray-700">Public Games Lobby</h3>
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-r from-purple-100 to-purple-200 p-2 rounded-lg">
+                    <Trophy className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-800">Admiral's Harbor</h3>
+                </div>
                 <button
                   onClick={() => {
                     setShowPublicLobby(!showPublicLobby);
                     if (!showPublicLobby) loadPublicGames();
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   <Users className="w-4 h-4" />
-                  {showPublicLobby ? 'Hide Lobby' : 'Show Public Games'}
+                  {showPublicLobby ? 'Hide Harbor' : 'Open Harbor'}
                 </button>
               </div>
 
@@ -1037,23 +1154,29 @@ const BattleshipGame: React.FC = () => {
 
         {/* Ship placement phase */}
         {gamePhase === 'placement' && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">🚢 Place Your Fleet</h2>
-                <p className="text-gray-600">
-                  {currentShipIndex < shipsToPlace.length 
-                    ? `Place ${STANDARD_FLEET[currentShipIndex].name} (${shipsToPlace[currentShipIndex].length} squares)`
-                    : 'All ships placed! Ready to start game.'
-                  }
-                </p>
+          <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8">
+              <div className="flex items-center gap-4">
+                <div className="bg-gradient-to-r from-blue-100 to-teal-100 p-3 rounded-full">
+                  <Ship className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent mb-2">Deploy Your Fleet</h2>
+                  <p className="text-gray-600">
+                    {currentShipIndex < shipsToPlace.length 
+                      ? `Position ${STANDARD_FLEET[currentShipIndex].name} (${shipsToPlace[currentShipIndex].length} squares)`
+                      : 'Fleet deployment complete! Ready for battle.'
+                    }
+                  </p>
+                </div>
               </div>
               
-              <div className="flex gap-2 mt-4 md:mt-0">
+              <div className="flex gap-3 mt-6 lg:mt-0">
                 <button
                   onClick={() => setShipOrientation(shipOrientation === 'horizontal' ? 'vertical' : 'horizontal')}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium"
                 >
+                  <Compass className="w-4 h-4 inline mr-2" />
                   Rotate ({shipOrientation})
                 </button>
                 <button
@@ -1468,6 +1591,6 @@ const BattleshipGame: React.FC = () => {
       </div>
     </div>
   );
-};
+  };
 
 export default BattleshipGame; 

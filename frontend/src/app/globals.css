@@ -2,108 +2,277 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Global styles for the Battleship game */
+/* Custom maritime theme colors and animations */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --ocean-blue: #0369a1;
+  --deep-teal: #0d9488;
+  --sea-foam: #a7f3d0;
+  --coral: #fbbf24;
+  --navy: #1e3a8a;
+  --wave-blue: #3b82f6;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
+/* Enhanced body background with subtle ocean texture */
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdfa 100%);
+  min-height: 100vh;
+  background-attachment: fixed;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Custom styles for wallet adapter */
+/* Wallet adapter button customization */
 .wallet-adapter-button {
-  @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded;
+  background: linear-gradient(135deg, var(--ocean-blue), var(--deep-teal)) !important;
+  border: none !important;
+  border-radius: 0.75rem !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 14px 0 rgba(3, 105, 161, 0.3) !important;
+}
+
+.wallet-adapter-button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px 0 rgba(3, 105, 161, 0.4) !important;
+}
+
+.wallet-adapter-button:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
 }
 
 .wallet-adapter-button-trigger {
-  @apply bg-blue-600 hover:bg-blue-700;
+  background: linear-gradient(135deg, var(--ocean-blue), var(--deep-teal)) !important;
+  color: white !important;
 }
 
-/* Game board cell animations */
-.game-cell {
-  transition: all 0.2s ease-in-out;
+/* Custom wave animation for loading states */
+@keyframes wave {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
 
-.game-cell:hover {
-  transform: scale(1.05);
+.wave-animation {
+  animation: wave 2s ease-in-out infinite;
 }
 
-/* Ship placement preview */
+/* Ocean ripple effect for interactive elements */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+}
+
+.ripple-effect:active::before {
+  width: 300px;
+  height: 300px;
+  animation: ripple 0.6s ease-out;
+}
+
+/* Enhanced game board styling */
+.game-board {
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  border: 2px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Ship placement hover effects */
 .ship-preview {
-  background-color: rgba(34, 197, 94, 0.3);
-  border: 2px dashed rgb(34, 197, 94);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(13, 148, 136, 0.3));
+  border: 2px dashed var(--ocean-blue);
+  border-radius: 0.25rem;
 }
 
-/* Hit/Miss markers */
+.ship-placed {
+  background: linear-gradient(135deg, var(--ocean-blue), var(--deep-teal));
+  color: white;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Hit and miss markers */
 .hit-marker {
-  color: #dc2626;
+  background: radial-gradient(circle, #ef4444, #dc2626);
+  color: white;
   font-weight: bold;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  animation: pulse 0.5s ease-in-out;
 }
 
 .miss-marker {
-  color: #ffffff;
-  font-weight: bold;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  background: radial-gradient(circle, #6b7280, #4b5563);
+  color: white;
+  opacity: 0.7;
 }
 
-/* Loading spinner */
-.spinner {
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #3498db;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  animation: spin 1s linear infinite;
+/* Naval-themed card effects */
+.naval-card {
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.naval-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-color: var(--ocean-blue);
 }
 
-/* Game status indicators */
-.status-waiting {
-  @apply text-yellow-600 font-semibold;
+/* Maritime gradient backgrounds */
+.ocean-gradient {
+  background: linear-gradient(135deg, #0ea5e9, #0d9488, #0369a1);
 }
 
-.status-playing {
-  @apply text-blue-600 font-semibold;
+.sea-gradient {
+  background: linear-gradient(135deg, #06b6d4, #0891b2, #0e7490);
 }
 
-.status-winner {
-  @apply text-green-600 font-bold;
+.wave-gradient {
+  background: linear-gradient(45deg, #3b82f6, #1d4ed8, #1e40af);
 }
 
-.status-loser {
-  @apply text-red-600 font-bold;
+/* Anchor and nautical icon effects */
+.anchor-icon {
+  filter: drop-shadow(0 2px 4px rgba(3, 105, 161, 0.3));
+  transition: transform 0.3s ease;
 }
 
-/* Responsive grid adjustments */
+.anchor-icon:hover {
+  transform: rotate(10deg) scale(1.1);
+}
+
+/* Enhanced toast notifications with maritime theme */
+.Toaster > div {
+  background: linear-gradient(135deg, #ffffff, #f8fafc) !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--ocean-blue), var(--deep-teal));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--deep-teal), var(--ocean-blue));
+}
+
+/* Focus states with maritime theme */
+.focus\:ring-ocean:focus {
+  ring-color: var(--ocean-blue);
+  ring-offset-color: #ffffff;
+}
+
+/* Custom maritime patterns */
+.wave-pattern {
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(13, 148, 136, 0.1) 0%, transparent 50%);
+}
+
+/* Loading spinner with ocean theme */
+@keyframes ocean-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.ocean-spinner {
+  animation: ocean-spin 2s linear infinite;
+  color: var(--ocean-blue);
+}
+
+/* Enhanced form elements */
+input[type="text"], input[type="email"], textarea {
+  transition: all 0.3s ease;
+  border-color: #d1d5db;
+}
+
+input[type="text"]:focus, input[type="email"]:focus, textarea:focus {
+  border-color: var(--ocean-blue);
+  box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.1);
+  outline: none;
+}
+
+/* Maritime button hover effects */
+.btn-maritime {
+  background: linear-gradient(135deg, var(--ocean-blue), var(--deep-teal));
+  color: white;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px 0 rgba(3, 105, 161, 0.3);
+}
+
+.btn-maritime:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px 0 rgba(3, 105, 161, 0.4);
+  background: linear-gradient(135deg, var(--deep-teal), var(--ocean-blue));
+}
+
+.btn-maritime:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 14px 0 rgba(3, 105, 161, 0.3);
+}
+
+/* Responsive maritime grid */
 @media (max-width: 768px) {
-  .game-boards-container {
-    flex-direction: column;
-    gap: 2rem;
+  .naval-card {
+    margin: 0.5rem;
   }
   
   .game-board {
-    transform: scale(0.8);
+    margin: 1rem 0.5rem;
+  }
+}
+
+/* Print styles for game states */
+@media print {
+  body {
+    background: white !important;
+  }
+  
+  .naval-card {
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
   }
 } 

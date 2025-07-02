@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { Wallet, TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react';
+import { Wallet, RefreshCw, TrendingDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface WalletBalanceProps {
@@ -24,12 +23,11 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
   const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number>(0);
-  const [solBalance, setSolBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [wagerAmount, setWagerAmount] = useState<number>(currentWager);
   const [wagerInput, setWagerInput] = useState<string>(currentWager > 0 ? currentWager.toString() : ''); // String for decimal input
 
-  // Fetch both SOL and GOR token balance
+  // Fetch GOR token balance ONLY - no Solana chain references
   const fetchBalance = async () => {
     if (!publicKey || !connected) return;
 
@@ -38,12 +36,7 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
       console.log('🔗 Using RPC endpoint: https://rpc.gorbagana.wtf/');
       console.log('🎒 Configured wallets: [ \'Backpack\' ]');
       
-      // Get SOL balance (for gas fees)
-      const lamports = await connection.getBalance(publicKey);
-      const solBal = lamports / LAMPORTS_PER_SOL;
-      setSolBalance(solBal);
-      
-      // Try to get GOR token balance
+      // Only try to get GOR token balance - no SOL fallback
       let gorBalance = 0;
       
       try {
@@ -62,16 +55,16 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
           const tokenInfo = tokenAccount.account.data.parsed.info;
           console.log(`🪙 Token found: ${tokenInfo.mint}, Balance: ${tokenInfo.tokenAmount.uiAmount}`);
           
-          // Check if this is a GOR token (you might need to adjust this logic)
+          // Check if this is a GOR token or any token with balance (since we're GOR-only now)
           if (tokenInfo.mint === GOR_TOKEN_MINT || 
-              tokenInfo.tokenAmount.uiAmount > 0) { // For now, take any token with balance
+              tokenInfo.tokenAmount.uiAmount > 0) {
             gorBalance = tokenInfo.tokenAmount.uiAmount || 0;
             console.log(`💰 GOR token found! Balance: ${gorBalance}`);
             break;
           }
         }
         
-        // If no specific GOR token found, but we have tokens, use the first one with balance
+        // If no specific GOR token found, use the first token with balance
         if (gorBalance === 0 && tokenAccounts.value.length > 0) {
           for (const tokenAccount of tokenAccounts.value) {
             const tokenInfo = tokenAccount.account.data.parsed.info;
@@ -84,23 +77,18 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
         }
         
       } catch (tokenError) {
-        console.log('ℹ️ No token accounts found or error fetching tokens:', tokenError);
-        // Fallback: if no tokens, check if the SOL balance should be treated as GOR
-        if (solBal > 0) {
-          gorBalance = solBal;
-          console.log(`💰 Using SOL balance as GOR: ${gorBalance}`);
-        }
+        console.log('ℹ️ No GOR token accounts found:', tokenError);
+        // NO FALLBACK TO SOL - we are GOR-only network
+        gorBalance = 0;
       }
       
       setBalance(gorBalance);
       console.log(`💰 Final GOR balance: ${gorBalance.toFixed(6)} GOR`);
-      console.log(`💰 SOL balance: ${solBal.toFixed(6)} SOL`);
       
     } catch (error) {
-      console.error('Error fetching balances:', error);
-      toast.error('Failed to fetch balance');
+      console.error('Error fetching GOR balance:', error);
+      toast.error('Failed to fetch GOR balance');
       setBalance(0);
-      setSolBalance(0);
     } finally {
       setLoading(false);
     }
@@ -173,29 +161,22 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
   }
 
   return (
-    <div className={`bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-200 rounded-lg p-4 ${className}`}>
+    <div className={`bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 ${className}`}>
       {/* Balance Display */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-r from-blue-600 to-teal-600 p-2 rounded-full">
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-2 rounded-full">
             <Wallet className="w-4 h-4 text-white" />
           </div>
           <div>
             <p className="text-sm text-gray-600">GOR Balance</p>
             <div className="flex items-center gap-2">
               {loading ? (
-                <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                <RefreshCw className="w-4 h-4 animate-spin text-green-600" />
               ) : (
-                <div className="space-y-1">
-                  <p className="text-lg font-bold text-gray-800">
-                    {balance.toFixed(4)} GOR
-                  </p>
-                  {solBalance > 0 && (
-                    <p className="text-xs text-gray-500">
-                      ({solBalance.toFixed(4)} SOL for gas)
-                    </p>
-                  )}
-                </div>
+                <p className="text-lg font-bold text-gray-800">
+                  {balance.toFixed(4)} GOR
+                </p>
               )}
             </div>
           </div>
@@ -204,7 +185,7 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
         <button
           onClick={fetchBalance}
           disabled={loading}
-          className="p-2 text-gray-600 hover:text-blue-600 transition-colors"
+          className="p-2 text-gray-600 hover:text-green-600 transition-colors"
           title="Refresh balance"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -214,73 +195,49 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
       {/* Wager Input Section */}
       {showWagerInput && (
         <div className="space-y-4">
-          <div className="border-t border-blue-200 pt-4">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Set Battle Wager
+              Set Waste Collection Wager
             </label>
-            
-            {/* Custom Amount Input */}
-            <div className="relative mb-3">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <DollarSign className="h-4 w-4 text-gray-400" />
-              </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">$</span>
               <input
                 type="text"
-                inputMode="decimal"
                 value={wagerInput}
                 onChange={(e) => handleWagerInputChange(e.target.value)}
-                className="block w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter amount (e.g. 0.002)"
+                placeholder="0.002"
+                className="w-full pl-8 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg font-medium"
               />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 text-sm">GOR</span>
-              </div>
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">GOR</span>
             </div>
-
-            {/* Quick Amount Buttons */}
-            <div className="grid grid-cols-5 gap-2 mb-3">
-              {quickWagers.map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => handleWagerChange(amount)}
-                  disabled={amount > balance}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
-                    wagerAmount === amount
-                      ? 'bg-blue-600 text-white'
-                      : amount > balance
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'
-                  }`}
-                >
-                  {amount}
-                </button>
-              ))}
-            </div>
-
-            {/* All-in Button */}
-            <button
-              onClick={() => handleWagerChange(balance)}
-              disabled={balance <= 0}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white py-2 px-4 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              All-in ({balance.toFixed(4)} GOR)
-            </button>
-
-            {/* Wager Info */}
-            {wagerAmount > 0 && (
-              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center gap-2 text-yellow-800 text-sm">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>
-                    Battle wager: <strong>{wagerAmount.toFixed(4)} GOR</strong>
-                  </span>
-                </div>
-                <p className="text-xs text-yellow-700 mt-1">
-                  Winner takes {(wagerAmount * 2).toFixed(4)} GOR total
-                </p>
-              </div>
-            )}
           </div>
+
+          {/* Quick wager buttons */}
+          <div className="flex flex-wrap gap-2">
+            {quickWagers.map((amount) => (
+              <button
+                key={amount}
+                onClick={() => handleWagerChange(amount)}
+                disabled={amount > balance}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  amount > balance
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                {amount}
+              </button>
+            ))}
+          </div>
+
+          {/* All-in button */}
+          <button
+            onClick={() => handleWagerChange(balance)}
+            disabled={balance === 0}
+            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            All-in ({balance.toFixed(4)} GOR)
+          </button>
         </div>
       )}
 

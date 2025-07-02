@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
-import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Anchor, Settings, Trophy, Waves, Compass, Target, Ship, DollarSign, AlertTriangle } from 'lucide-react';
+import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Trash2, Settings, Trophy, Waves, Compass, Target, Truck, DollarSign, AlertTriangle } from 'lucide-react';
 
 import GameBoard from './GameBoard';
 import GorbaganaFaucet from './GorbaganaFaucet';
@@ -970,8 +970,8 @@ const BattleshipGame: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-lg shadow-lg p-8">
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-gray-800 mb-4">⚓ Choose Battle Mode</h1>
-              <p className="text-gray-600">Select your preferred game style for the ultimate naval warfare experience</p>
+              <h1 className="text-4xl font-bold text-gray-800 mb-4">🗑️ Choose Collection Mode</h1>
+              <p className="text-gray-600">Select your preferred waste management style for the ultimate trash collection experience</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
@@ -988,7 +988,7 @@ const BattleshipGame: React.FC = () => {
                   } text-white`}
                 >
                   <div className="text-4xl mb-3">
-                    {key === 'quick' ? '⚡' : key === 'standard' ? '⚓' : '🚢'}
+                    {key === 'quick' ? '🚛' : key === 'standard' ? '🗑️' : '🏭'}
                   </div>
                   <h3 className="text-xl font-bold mb-2">{config.name}</h3>
                   <p className="text-sm opacity-90 mb-3">{config.description}</p>
@@ -1075,10 +1075,10 @@ const BattleshipGame: React.FC = () => {
           </div>
 
           {/* Wallet Info Bar */}
-          <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 text-sm">
+                      <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 text-sm">
             <div className="flex items-center gap-4 text-gray-600">
-              <span className="font-medium">Fleet Admiral:</span>
-              <code className="bg-blue-50 px-2 py-1 rounded text-blue-700 border border-blue-200">
+              <span className="font-medium">Waste Manager:</span>
+              <code className="bg-green-50 px-2 py-1 rounded text-green-700 border border-green-200">
                 {publicKey?.toString().slice(0, 8)}...{publicKey?.toString().slice(-8)}
               </code>
             </div>
@@ -1113,14 +1113,14 @@ const BattleshipGame: React.FC = () => {
             </div>
             
             <div className="flex flex-col items-center space-y-4">
-              <button
-                onClick={() => setShowGameModeSelector(true)}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 text-lg"
-              >
-                <Anchor className="w-6 h-6" />
-                🚀 START PLAYING BATTLESHIP
-              </button>
-              <p className="text-sm text-gray-500">Select game mode • Deploy ships • Battle for glory!</p>
+                                  <button
+                      onClick={() => setShowGameModeSelector(true)}
+                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 text-lg"
+                    >
+                      <Trash2 className="w-6 h-6" />
+                      🚛 START TRASH COLLECTION
+                    </button>
+                                    <p className="text-sm text-gray-500">Select collection mode • Deploy garbage trucks • Collect for victory!</p>
             </div>
           </div>
         )}
@@ -1130,10 +1130,10 @@ const BattleshipGame: React.FC = () => {
           <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
-                <div className="bg-gradient-to-r from-blue-100 to-teal-100 p-3 rounded-full">
-                  <Ship className="w-6 h-6 text-blue-600" />
+                <div className="bg-gradient-to-r from-green-100 to-emerald-100 p-3 rounded-full">
+                  <Trash2 className="w-6 h-6 text-green-600" />
                 </div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">Fleet Command Center</h2>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">The Landfill Command Center</h2>
               </div>
               <button
                 onClick={() => setShowGameModeSelector(true)}
@@ -1184,10 +1184,10 @@ const BattleshipGame: React.FC = () => {
                       setGamePhase('placement');
                     }}
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    <Anchor className="w-5 h-5" />
-                    🎯 Deploy Fleet
+                    <Truck className="w-5 h-5" />
+                    🗑️ Deploy Garbage Fleet
                   </button>
                 </div>
               </div>
@@ -1204,10 +1204,10 @@ const BattleshipGame: React.FC = () => {
                 <div className="space-y-4">
                   <input
                     type="text"
-                    placeholder="Enter Battle ID or paste invitation link"
+                    placeholder="Enter Collection ID or paste invitation link"
                     value={gameIdInput}
                     onChange={(e) => setGameIdInput(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                   />
                   
                   <button
@@ -1215,14 +1215,14 @@ const BattleshipGame: React.FC = () => {
                       if (gameIdInput.trim()) {
                         setGamePhase('placement');
                       } else {
-                        toast.error('Please enter a Battle ID');
+                        toast.error('Please enter a Collection ID');
                       }
                     }}
                     disabled={loading || !gameIdInput.trim()}
-                    className="w-full bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <Users className="w-5 h-5" />
-                    ⚔️ Join Battle
+                    🚛 Join Collection
                   </button>
                 </div>
                 
@@ -1249,9 +1249,9 @@ const BattleshipGame: React.FC = () => {
                     className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg mx-auto"
                   >
                     <Trophy className="w-5 h-5" />
-                    🏆 Browse Admiral's Harbor
+                    🏆 Browse The Landfill
                   </button>
-                  <p className="text-gray-600 text-sm mt-2">Discover public battles waiting for challengers</p>
+                                      <p className="text-gray-600 text-sm mt-2">Discover public waste collection routes waiting for workers</p>
                 </div>
               )}
             </div>
@@ -1434,7 +1434,7 @@ const BattleshipGame: React.FC = () => {
 
             {/* Show your fleet while waiting */}
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">🛡️ Your Fleet (Ready for Battle)</h3>
+              <h3 className="text-xl font-bold text-gray-800 mb-4">🗑️ Your Garbage Fleet (Ready for Collection)</h3>
               <div className="flex justify-center">
                 <GameBoard
                   board={playerBoard}
@@ -1448,7 +1448,7 @@ const BattleshipGame: React.FC = () => {
                 />
               </div>
               <div className="mt-4 text-center text-sm text-gray-600">
-                Fleet deployed: {getTotalShipSquares()} ship squares ready for battle
+                Fleet deployed: {getTotalShipSquares()} garbage truck units ready for collection
               </div>
             </div>
 

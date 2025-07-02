@@ -1,57 +1,53 @@
 #!/usr/bin/env pwsh
 
-Write-Host "🚀 Starting Gorbagana Battleship Servers..." -ForegroundColor Green
+# Gorbagana Trash Collection - Server Startup Script
+# This script starts both backend (port 3002) and frontend (port 3000) servers
 
-# Kill any existing Node processes to avoid port conflicts
-Write-Host "🔧 Cleaning up existing processes..." -ForegroundColor Yellow
+Write-Host "🗑️ Starting Gorbagana Trash Collection Servers..." -ForegroundColor Green
+Write-Host "=============================================" -ForegroundColor Green
+
+# Clean up any existing node processes that might be using our ports
+Write-Host "🧹 Cleaning up existing Node.js processes..." -ForegroundColor Yellow
 try {
+    # Kill all node processes (careful - this kills ALL node processes)
     taskkill /f /im node.exe 2>$null
-    Write-Host "✅ Cleaned up existing Node.js processes" -ForegroundColor Green
-} catch {
+    Write-Host "✅ Existing processes cleaned up" -ForegroundColor Green
+}
+catch {
     Write-Host "ℹ️ No existing Node.js processes found" -ForegroundColor Cyan
 }
 
-# Start backend server
-Write-Host "🛡️ Starting backend server (port 3002)..." -ForegroundColor Yellow
-Start-Job -ScriptBlock { 
-    Set-Location 'C:\Users\jgran\gorbagana-battleship'
-    node server.js 
-} -Name "BackendServer" | Out-Null
+# Wait a moment for ports to be released
+Start-Sleep -Seconds 2
+
+# Start Backend Server (Port 3002)
+Write-Host ""
+Write-Host "🚀 Starting Backend Server on port 3002..." -ForegroundColor Cyan
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; npm run dev" -WindowStyle Normal
 
 # Wait a moment for backend to start
 Start-Sleep -Seconds 3
 
-# Start frontend server
-Write-Host "🎮 Starting frontend server (port 3000)..." -ForegroundColor Yellow
-Start-Job -ScriptBlock { 
-    Set-Location 'C:\Users\jgran\gorbagana-battleship\frontend'
-    npm run dev 
-} -Name "FrontendServer" | Out-Null
+# Start Frontend Server (Port 3000)  
+Write-Host "🌐 Starting Frontend Server on port 3000..." -ForegroundColor Cyan
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD/frontend'; npm run dev" -WindowStyle Normal
 
-# Wait for servers to initialize
-Write-Host "⏳ Waiting for servers to initialize..." -ForegroundColor Yellow
-Start-Sleep -Seconds 10
+# Wait a moment for frontend to start
+Start-Sleep -Seconds 3
 
-# Check if servers are running
-Write-Host "🔍 Checking server status..." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "🎉 Servers Starting!" -ForegroundColor Green
+Write-Host "================================" -ForegroundColor Green
+Write-Host "🗑️ Backend:  http://localhost:3002" -ForegroundColor Yellow
+Write-Host "🌐 Frontend: http://localhost:3000" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "📝 Both servers are opening in separate PowerShell windows" -ForegroundColor Cyan
+Write-Host "⚠️ Keep those windows open while playing" -ForegroundColor Red
+Write-Host ""
+Write-Host "🎮 Ready to play Gorbagana Trash Collection!" -ForegroundColor Green
+Write-Host "💰 Don't forget to get GOR tokens from the faucet!" -ForegroundColor Magenta
 
-try {
-    $backendResponse = Invoke-RestMethod -Uri "http://localhost:3002/health" -TimeoutSec 5
-    Write-Host "✅ Backend server is running on http://localhost:3002" -ForegroundColor Green
-} catch {
-    Write-Host "❌ Backend server failed to start" -ForegroundColor Red
-}
-
-try {
-    $frontendResponse = Invoke-WebRequest -Uri "http://localhost:3000" -TimeoutSec 5
-    if ($frontendResponse.StatusCode -eq 200) {
-        Write-Host "✅ Frontend server is running on http://localhost:3000" -ForegroundColor Green
-    }
-} catch {
-    Write-Host "❌ Frontend server failed to start" -ForegroundColor Red
-}
-
-Write-Host "`n🎯 Gorbagana Battleship is ready!" -ForegroundColor Green
-Write-Host "🌐 Open your browser to: http://localhost:3000" -ForegroundColor Cyan
-Write-Host "💰 Connect your wallet using the button in the top-right corner!" -ForegroundColor Magenta
-Write-Host "`n📝 To stop servers, run: Get-Job | Stop-Job" -ForegroundColor Yellow 
+# Wait for user input before closing
+Write-Host ""
+Write-Host "Press any key to exit this script (servers will keep running)..." -ForegroundColor Gray
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") 

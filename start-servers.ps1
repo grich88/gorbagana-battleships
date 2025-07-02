@@ -1,53 +1,64 @@
-#!/usr/bin/env pwsh
+# GORBAGANA BATTLESHIP - DEVELOPMENT SERVER STARTUP SCRIPT
+# Solves Windows PowerShell syntax and port conflict issues
 
-# Gorbagana Trash Collection - Server Startup Script
-# This script starts both backend (port 3002) and frontend (port 3000) servers
+Write-Host "GORBAGANA BATTLESHIP - STARTING DEVELOPMENT SERVERS" -ForegroundColor Green
+Write-Host "Welcome to the Landfill - Managing Garbage Fleet Operations" -ForegroundColor Yellow
 
-Write-Host "🗑️ Starting Gorbagana Trash Collection Servers..." -ForegroundColor Green
-Write-Host "=============================================" -ForegroundColor Green
-
-# Clean up any existing node processes that might be using our ports
-Write-Host "🧹 Cleaning up existing Node.js processes..." -ForegroundColor Yellow
+# Clean up any existing Node.js processes to prevent port conflicts
+Write-Host "Cleaning up existing Node.js processes..." -ForegroundColor Yellow
 try {
-    # Kill all node processes (careful - this kills ALL node processes)
     taskkill /f /im node.exe 2>$null
-    Write-Host "✅ Existing processes cleaned up" -ForegroundColor Green
+    Start-Sleep -Seconds 2
+    Write-Host "Process cleanup completed" -ForegroundColor Green
 }
 catch {
-    Write-Host "ℹ️ No existing Node.js processes found" -ForegroundColor Cyan
+    Write-Host "No existing Node.js processes to clean up" -ForegroundColor Gray
 }
 
-# Wait a moment for ports to be released
+# Check port availability
+$backendPort = 3002
+$frontendPort = 3000
+
+Write-Host "Checking port availability..." -ForegroundColor Cyan
+
+# Kill any processes using our ports
+Write-Host "Freeing up ports..." -ForegroundColor Yellow
+netstat -ano | findstr ":$backendPort" | ForEach-Object {
+    $pid = ($_ -split '\s+')[-1]
+    if ($pid -and $pid -ne "0") {
+        try {
+            taskkill /f /pid $pid 2>$null
+        }
+        catch {
+            # Ignore errors
+        }
+    }
+}
+
 Start-Sleep -Seconds 2
 
-# Start Backend Server (Port 3002)
-Write-Host ""
-Write-Host "🚀 Starting Backend Server on port 3002..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; npm run dev" -WindowStyle Normal
+# Start Backend Server in new PowerShell window
+Write-Host "Starting Garbage Fleet Backend Server (Port $backendPort)..." -ForegroundColor Green
+$backendCmd = "Write-Host 'LANDFILL OPERATIONS CENTER' -ForegroundColor Green; Write-Host 'Starting waste management backend...' -ForegroundColor Yellow; Set-Location '$PWD'; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
 
 # Wait a moment for backend to start
-Start-Sleep -Seconds 3
+Write-Host "Waiting for landfill operations to initialize..." -ForegroundColor Yellow
+Start-Sleep -Seconds 5
 
-# Start Frontend Server (Port 3000)  
-Write-Host "🌐 Starting Frontend Server on port 3000..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD/frontend'; npm run dev" -WindowStyle Normal
-
-# Wait a moment for frontend to start
-Start-Sleep -Seconds 3
+# Start Frontend Server in new PowerShell window  
+Write-Host "Starting Garbage Fleet Command Center (Port $frontendPort+)..." -ForegroundColor Green
+$frontendCmd = "Write-Host 'GARBAGE FLEET COMMAND CENTER' -ForegroundColor Green; Write-Host 'Starting trash collection interface...' -ForegroundColor Yellow; Set-Location '$PWD/frontend'; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd -WindowStyle Normal
 
 Write-Host ""
-Write-Host "🎉 Servers Starting!" -ForegroundColor Green
-Write-Host "================================" -ForegroundColor Green
-Write-Host "🗑️ Backend:  http://localhost:3002" -ForegroundColor Yellow
-Write-Host "🌐 Frontend: http://localhost:3000" -ForegroundColor Yellow
+Write-Host "GORBAGANA BATTLESHIP SERVERS STARTING..." -ForegroundColor Green
+Write-Host "Backend (Landfill): http://localhost:$backendPort" -ForegroundColor Cyan
+Write-Host "Frontend (Fleet Command): http://localhost:$frontendPort (or next available)" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "📝 Both servers are opening in separate PowerShell windows" -ForegroundColor Cyan
-Write-Host "⚠️ Keep those windows open while playing" -ForegroundColor Red
+Write-Host "Garbage Fleet is deploying..." -ForegroundColor Yellow
+Write-Host "Check the new PowerShell windows for server status" -ForegroundColor Gray
+Write-Host "If ports are still in use, manually kill Node.js processes and try again" -ForegroundColor Red
 Write-Host ""
-Write-Host "🎮 Ready to play Gorbagana Trash Collection!" -ForegroundColor Green
-Write-Host "💰 Don't forget to get GOR tokens from the faucet!" -ForegroundColor Magenta
-
-# Wait for user input before closing
-Write-Host ""
-Write-Host "Press any key to exit this script (servers will keep running)..." -ForegroundColor Gray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") 
+Write-Host "TIP: Use Ctrl+C in each server window to stop servers cleanly" -ForegroundColor Yellow
+Write-Host "Welcome to the Landfill - Happy Waste Collection!" -ForegroundColor Green 

@@ -252,8 +252,8 @@ const LandingPage: React.FC = () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Gorbagana Trash Collection',
-          text: 'Join me for an epic waste collection battle on the Gorbagana blockchain!',
+          title: 'Gorchain Trash Collection',
+          text: 'Join me for an epic waste collection battle on the Gorchain blockchain!',
           url: window.location.href,
         });
         toast.success('🎯 Game shared successfully!');
@@ -498,7 +498,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  Gorbagana Trash Collection
+                  Gorchain Trash Collection
                 </h1>
                 <p className="text-sm text-gray-600">Waste Management on the Blockchain</p>
               </div>
@@ -584,7 +584,7 @@ const LandingPage: React.FC = () => {
                     Welcome to The Landfill
                   </h2>
                   <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                    Deploy your garbage trucks in strategic formations and compete in the ultimate waste collection battle on the Gorbagana blockchain!
+                    Deploy your garbage trucks in strategic formations and compete in the ultimate waste collection battle on the Gorchain blockchain!
                   </p>
                   
                   <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6 max-w-lg mx-auto">
@@ -599,7 +599,7 @@ const LandingPage: React.FC = () => {
                       <Zap className="w-6 h-6 text-green-600" />
                     </div>
                     <h3 className="font-semibold text-gray-800 mb-2">Lightning Fast</h3>
-                    <p className="text-sm text-gray-600">Quick waste collection battles powered by Gorbagana</p>
+                    <p className="text-sm text-gray-600">Quick waste collection battles powered by Gorchain</p>
                   </div>
 
                   <div className="text-center p-6 bg-white rounded-lg border border-gray-200">

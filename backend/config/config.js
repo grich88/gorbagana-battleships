@@ -72,7 +72,7 @@ const config = {
 
   // Blockchain Configuration
   blockchain: {
-    rpcUrl: process.env.SOLANA_RPC_URL || 'https://rpc.gorbagana.wtf/',
+    rpcUrl: process.env.SOLANA_RPC_URL || 'https://gorchain.wstf.io',
     programId: process.env.PROGRAM_ID || 'DRJk4gJFdYCCHNYY5qFZfrM9ysNrMz3kXJN5JVZdz8Jm'
   },
 

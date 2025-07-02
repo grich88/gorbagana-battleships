@@ -783,7 +783,7 @@ const startServer = async () => {
     
     // Start the server
     app.listen(PORT, () => {
-      console.log('\n🚀🚀🚀 GORBAGANA BATTLESHIP BACKEND STARTED 🚀🚀🚀');
+      console.log('\n🚀🚀🚀 GORCHAIN BATTLESHIP BACKEND STARTED 🚀🚀🚀');
       console.log(`⚓ Server running on http://localhost:${PORT}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`📋 Public games: http://localhost:${PORT}/api/games/public`);

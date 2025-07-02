@@ -132,8 +132,20 @@ const LandingPage: React.FC = () => {
     if (connected && typeof window !== 'undefined') {
       console.log('✅ Wallet connected via adapter, clearing refresh cooldown');
       localStorage.removeItem('walletRefreshTime');
+      localStorage.removeItem('manualConnectionRefresh');
     }
   }, [connected]);
+
+  // Check if this page load was from a manual connection refresh
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const wasManualRefresh = localStorage.getItem('manualConnectionRefresh');
+      if (wasManualRefresh) {
+        console.log('🔄 Page loaded after manual connection refresh, clearing flag');
+        localStorage.removeItem('manualConnectionRefresh');
+      }
+    }
+  }, []);
 
   // Check for wallet connection state changes - with smart refresh prevention
   useEffect(() => {
@@ -370,8 +382,9 @@ const LandingPage: React.FC = () => {
                              console.log('✅ Connected via direct Backpack interface:', result.publicKey.toString());
                              toast.success('🎉 Backpack wallet connected successfully!');
                              toast('🔄 Syncing wallet state...', { duration: 2000 });
-                             // Force refresh to sync wallet adapter state with cooldown protection
+                             // Force refresh to sync wallet adapter state (manual connection overrides cooldown)
                              localStorage.setItem('walletRefreshTime', Date.now().toString());
+                             localStorage.setItem('manualConnectionRefresh', 'true');
                              setTimeout(() => window.location.reload(), 1000);
                              return;
                            }
@@ -465,8 +478,9 @@ const LandingPage: React.FC = () => {
                            console.log('✅ Connected via Wallet Standard:', accounts[0].address);
                            toast.success(`🎉 ${targetWallet.name} wallet connected successfully!`);
                            toast('🔄 Syncing wallet state...', { duration: 2000 });
-                           // Force refresh to sync wallet adapter state with cooldown protection
+                           // Force refresh to sync wallet adapter state (manual connection overrides cooldown)
                            localStorage.setItem('walletRefreshTime', Date.now().toString());
+                           localStorage.setItem('manualConnectionRefresh', 'true');
                            setTimeout(() => window.location.reload(), 1000);
                            return;
                          }
@@ -482,8 +496,9 @@ const LandingPage: React.FC = () => {
                       console.log('✅ Connected via legacy interface:', response.publicKey.toString());
                       toast.success('🎉 Wallet connected successfully!');
                       toast('🔄 Syncing wallet state...', { duration: 2000 });
-                      // Force refresh to sync wallet adapter state with cooldown protection
+                      // Force refresh to sync wallet adapter state (manual connection overrides cooldown)
                       localStorage.setItem('walletRefreshTime', Date.now().toString());
+                      localStorage.setItem('manualConnectionRefresh', 'true');
                       setTimeout(() => window.location.reload(), 1000);
                     } else {
                       console.log('❌ No Solana wallet detected');

@@ -122,6 +122,17 @@ const LandingPage: React.FC = () => {
       wallet: wallet?.adapter?.name,
       timestamp: new Date().toISOString()
     });
+    
+    // Also log the actual wallet object details
+    console.log('🔍 DETAILED WALLET STATE:', {
+      connected,
+      publicKey,
+      wallet,
+      hasPublicKey: !!publicKey,
+      adapterName: wallet?.adapter?.name,
+      adapterConnected: wallet?.adapter?.connected,
+      walletExists: !!wallet
+    });
   }, [connected, publicKey, wallet]);
 
   // Check for game ID in URL params on mount
@@ -339,6 +350,14 @@ const LandingPage: React.FC = () => {
             </div>
           </nav>
 
+          {/* DEBUG: Show which state we're in */}
+          <div className="mb-4 p-4 bg-blue-100 border border-blue-300 rounded-lg text-center">
+            <h3 className="text-blue-800 font-bold">🔍 DEBUG: CURRENT STATE</h3>
+            <p className="text-blue-700">Connected: {connected ? 'YES' : 'NO'}</p>
+            <p className="text-blue-700">PublicKey: {publicKey ? publicKey.toString().slice(0, 8) + '...' : 'NONE'}</p>
+            <p className="text-blue-700">Showing: {connected ? 'CONNECTED VIEW' : 'NOT CONNECTED VIEW'}</p>
+          </div>
+
           {/* Main Content */}
           {connected ? (
             <div className="max-w-4xl mx-auto">
@@ -413,24 +432,30 @@ const LandingPage: React.FC = () => {
                     </div>
                     
                     <div className="flex justify-center gap-2">
-                      <WalletMultiButton 
-                        style={{
-                          backgroundColor: '#059669',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '0.75rem',
-                          fontWeight: '600',
-                          padding: '0.75rem 2rem',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                          transition: 'all 0.2s ease',
-                          fontSize: '1rem'
-                        }}
-                      />
+                      {/* DEBUG: Check if WalletMultiButton renders */}
+                      <div className="p-2 bg-green-200 border border-green-400 rounded">
+                        <p className="text-xs text-green-800 mb-2">WalletMultiButton should appear below:</p>
+                        <WalletMultiButton 
+                          style={{
+                            backgroundColor: '#059669',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.75rem',
+                            fontWeight: '600',
+                            padding: '0.75rem 2rem',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                            transition: 'all 0.2s ease',
+                            fontSize: '1rem'
+                          }}
+                        />
+                        <p className="text-xs text-green-800 mt-2">If you only see this text, WalletMultiButton failed to render</p>
+                      </div>
                       
                       {/* DEBUG: Fallback button */}
                       <button 
                         onClick={() => {
                           console.log('🔘 FALLBACK BUTTON CLICKED');
+                          console.log('🔍 Current wallet state at click:', { connected, publicKey: publicKey?.toString(), wallet: wallet?.adapter?.name });
                           toast('🔘 Fallback button works! Check console for wallet debug info.');
                         }}
                         className="bg-orange-600 text-white px-4 py-2 rounded-lg"

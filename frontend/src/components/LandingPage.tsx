@@ -196,6 +196,26 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className={`min-h-screen ${gradientBg} relative overflow-hidden`}>
+      {/* Prominent Wallet Connection Banner - Show at top when not connected */}
+      {!connected && (
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-4 shadow-lg">
+          <div className="container mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-full">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">🔗 Connect Your Wallet to Start Playing</h3>
+                <p className="text-green-100 text-sm">Deploy your garbage trucks and start collecting!</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <WalletMultiButton className="!bg-white !text-green-600 hover:!bg-green-50 !border-0 !rounded-lg !font-semibold !transition-all !duration-200 !shadow-lg hover:!shadow-xl !px-6 !py-3" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating Icons Animation */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-10 left-10 opacity-20 animate-bounce">
@@ -239,45 +259,12 @@ const LandingPage: React.FC = () => {
                 Share
               </button>
 
-              {/* Wallet Connection */}
-              <div className="wallet-connection-area">
-                <WalletMultiButton className="!bg-gradient-to-r !from-green-600 !to-emerald-600 hover:!from-green-700 hover:!to-emerald-700 !border-0 !rounded-lg !font-semibold !text-white !transition-all !duration-200 !shadow-lg hover:!shadow-xl !px-6 !py-3" />
-                
-                {/* Fallback wallet button with extra visibility */}
-                <div 
-                  className="simple-wallet-fallback"
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 9999,
-                    padding: '12px 24px',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    fontSize: '16px',
-                    minWidth: '160px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <SimpleWalletButton 
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'white',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      width: '100%',
-                    }}
-                  />
+              {/* Wallet Connection - Only show when connected */}
+              {connected && (
+                <div className="wallet-connection-area">
+                  <WalletMultiButton className="!bg-gradient-to-r !from-green-600 !to-emerald-600 hover:!from-green-700 hover:!to-emerald-700 !border-0 !rounded-lg !font-semibold !text-white !transition-all !duration-200 !shadow-lg hover:!shadow-xl !px-6 !py-3" />
                 </div>
-              </div>
+              )}
             </div>
           </nav>
 

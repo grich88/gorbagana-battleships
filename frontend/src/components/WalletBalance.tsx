@@ -32,9 +32,8 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
       console.log('💰 Fetching $GOR balance via backend proxy for:', walletAddress);
       
       // Use backend proxy to avoid CORS and RPC issues
-      const backendUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://gorbagana-battleship-backend.onrender.com'
-        : 'http://localhost:3002';
+      // Note: Using local backend until production deployment is updated with balance endpoint
+      const backendUrl = 'http://localhost:3002';
       
       const response = await fetch(`${backendUrl}/api/balance/${walletAddress}`);
       

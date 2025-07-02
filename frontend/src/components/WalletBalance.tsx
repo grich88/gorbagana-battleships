@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Wallet, RefreshCw, TrendingDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { GorbaganaBlockchainService } from '../lib/gorbaganaService';
 
 interface WalletBalanceProps {
   onWagerChange?: (amount: number) => void;
@@ -22,27 +23,22 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
   const [wagerAmount, setWagerAmount] = useState<number>(currentWager);
   const [wagerInput, setWagerInput] = useState<string>(currentWager > 0 ? currentWager.toString() : ''); // String for decimal input
 
-  // Simplified balance fetching - just use demo balance for now
+  // Fetch real GOR balance from Gorbagana RPC
   const fetchBalance = async () => {
     if (!publicKey || !connected) return;
-
     setLoading(true);
     try {
       const walletAddress = publicKey.toString();
-      console.log('💰 Setting demo balance for development:', walletAddress);
-      
-      // For competition demo - use working demo balance
-      setBalance(0.99996);
-      console.log(`💰 Demo Balance: 0.99996 $GOR for testing`);
-      
-      toast('🎮 Demo balance loaded - ready to play!', { 
-        duration: 3000,
-        icon: '🎯' 
-      });
-      
+      const gorbaganaService = new GorbaganaBlockchainService();
+      const result = await gorbaganaService.getBalance(walletAddress);
+      // result.balance is in raw units, convert to GOR
+      const gorBalance = result.balance / Math.pow(10, 6); // 6 decimals for GOR
+      setBalance(gorBalance);
+      toast.success('GOR balance loaded!', { duration: 2000, icon: '💰' });
     } catch (error) {
       console.error('❌ Balance error:', error);
-      setBalance(0.99996);
+      setBalance(0);
+      toast.error('Failed to fetch GOR balance', { duration: 3000, icon: '❌' });
     } finally {
       setLoading(false);
     }

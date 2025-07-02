@@ -22,130 +22,27 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
   const [wagerAmount, setWagerAmount] = useState<number>(currentWager);
   const [wagerInput, setWagerInput] = useState<string>(currentWager > 0 ? currentWager.toString() : ''); // String for decimal input
 
-  // Fetch GOR balance using backend proxy - fixes CORS and RPC issues
+  // Simplified balance fetching - just use demo balance for now
   const fetchBalance = async () => {
     if (!publicKey || !connected) return;
 
     setLoading(true);
     try {
       const walletAddress = publicKey.toString();
-      console.log('💰 Fetching $GOR balance via backend proxy for:', walletAddress);
+      console.log('💰 Setting demo balance for development:', walletAddress);
       
-      // Use backend proxy to avoid CORS and RPC issues
-      // Try multiple backend URLs to avoid ad-blocker blocking
-      const backendUrls = [
-        'http://localhost:3002',
-        'http://127.0.0.1:3002',
-        window.location.protocol + '//' + window.location.hostname + ':3002'
-      ];
+      // For competition demo - use working demo balance
+      setBalance(0.99996);
+      console.log(`💰 Demo Balance: 0.99996 $GOR for testing`);
       
-      let response = null;
-      let lastError = null;
-      
-      for (const backendUrl of backendUrls) {
-        try {
-          console.log(`💰 Trying balance API: ${backendUrl}/api/balance/${walletAddress.slice(0, 8)}...`);
-          response = await fetch(`${backendUrl}/api/balance/${walletAddress}`, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-            cache: 'no-cache'
-          });
-          
-          if (response.ok) {
-            console.log(`✅ Balance API successful via: ${backendUrl}`);
-            break;
-          } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-        } catch (error) {
-          console.log(`❌ Balance API failed via ${backendUrl}:`, error.message);
-          lastError = error;
-          response = null;
-          continue;
-        }
-      }
-      
-      if (!response || !response.ok) {
-        throw lastError || new Error('All balance API endpoints failed');
-      }
-      
-      const data = await response.json();
-      console.log('💰 Balance Response:', data);
-      
-      if (data.error && !data.gor) {
-        throw new Error(data.error);
-      }
-      
-      const gorBalance = data.gor || 0;
-      setBalance(gorBalance);
-      
-      console.log(`💰 $GOR Balance: ${gorBalance.toFixed(6)} $GOR (${data.lamports} lamports) via ${data.endpoint}`);
-      
-      // Show warnings for demo/fallback balances
-      if (data.demo) {
-        console.log('⚠️ Using demo balance - Gorbagana network may be unavailable');
-        if (data.status === 'network_unavailable') {
-          toast('🌐 Gorbagana network unavailable - using demo $GOR balance', { 
-            duration: 5000,
-            icon: '⚠️'
-          });
-        }
-      } else {
-        console.log(`✅ Connected to ${data.network} - real $GOR balance detected`);
-        if (data.network === 'Gorbagana') {
-          toast.success('🎯 Connected to Gorbagana network!', { duration: 3000 });
-        }
-        
-        // Warn about zero balance on real network
-        if (gorBalance === 0) {
-          toast.error('⚠️ Zero $GOR balance - you need $GOR tokens to play!');
-        }
-      }
+      toast('🎮 Demo balance loaded - ready to play!', { 
+        duration: 3000,
+        icon: '🎯' 
+      });
       
     } catch (error) {
-      console.error('❌ Failed to fetch $GOR balance via all endpoints:', error);
-      
-      // Production fallback: Try direct Gorbagana RPC as final attempt
-      try {
-        console.log('🔄 Trying direct Gorbagana RPC as final fallback...');
-        const directResponse = await fetch('https://rpc.gorbagana.wtf/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'getBalance',
-            params: [walletAddress]
-          })
-        });
-        
-        if (directResponse.ok) {
-          const directData = await directResponse.json();
-          if (directData.result !== undefined) {
-            const lamports = directData.result.value !== undefined ? directData.result.value : directData.result;
-            const gorBalance = lamports / 1000000000;
-            setBalance(gorBalance);
-            console.log(`✅ Direct Gorbagana balance: ${gorBalance.toFixed(6)} $GOR`);
-            toast.success('🎯 Connected directly to Gorbagana network!');
-            return;
-          }
-        }
-      } catch (directError) {
-        console.log('❌ Direct Gorbagana RPC also failed:', directError.message);
-      }
-      
-      // Final fallback to demo balance
+      console.error('❌ Balance error:', error);
       setBalance(0.99996);
-      console.log('⚠️ All balance methods failed - using demo balance for development');
-      toast('⚠️ Balance service unavailable - using demo balance', { 
-        duration: 6000,
-        icon: '⚠️' 
-      });
     } finally {
       setLoading(false);
     }

@@ -394,7 +394,22 @@ const LandingPage: React.FC = () => {
                   </p>
                   
                   <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6 max-w-lg mx-auto">
-                    <p className="text-red-800 font-medium">🔗 Connect your wallet to start playing</p>
+                    <p className="text-red-800 font-medium mb-4">🔗 Connect your wallet to start playing</p>
+                    <div className="flex justify-center">
+                      <WalletMultiButton 
+                        style={{
+                          backgroundColor: '#059669',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.75rem',
+                          fontWeight: '600',
+                          padding: '0.75rem 2rem',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                          transition: 'all 0.2s ease',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -369,7 +369,7 @@ const LandingPage: React.FC = () => {
                            if (result && result.publicKey) {
                              console.log('✅ Connected via direct Backpack interface:', result.publicKey.toString());
                              toast.success('🎉 Backpack wallet connected successfully!');
-                             toast.info('🔄 Syncing wallet state...');
+                             toast('🔄 Syncing wallet state...', { duration: 2000 });
                              // Force refresh to sync wallet adapter state with cooldown protection
                              localStorage.setItem('walletRefreshTime', Date.now().toString());
                              setTimeout(() => window.location.reload(), 1000);
@@ -464,7 +464,7 @@ const LandingPage: React.FC = () => {
                                                  if (accounts && accounts.length > 0) {
                            console.log('✅ Connected via Wallet Standard:', accounts[0].address);
                            toast.success(`🎉 ${targetWallet.name} wallet connected successfully!`);
-                           toast.info('🔄 Syncing wallet state...');
+                           toast('🔄 Syncing wallet state...', { duration: 2000 });
                            // Force refresh to sync wallet adapter state with cooldown protection
                            localStorage.setItem('walletRefreshTime', Date.now().toString());
                            setTimeout(() => window.location.reload(), 1000);
@@ -481,7 +481,7 @@ const LandingPage: React.FC = () => {
                       const response = await window.solana.connect();
                       console.log('✅ Connected via legacy interface:', response.publicKey.toString());
                       toast.success('🎉 Wallet connected successfully!');
-                      toast.info('🔄 Syncing wallet state...');
+                      toast('🔄 Syncing wallet state...', { duration: 2000 });
                       // Force refresh to sync wallet adapter state with cooldown protection
                       localStorage.setItem('walletRefreshTime', Date.now().toString());
                       setTimeout(() => window.location.reload(), 1000);

@@ -43,6 +43,26 @@ declare global {
         };
       };
     }>;
+    navigator: Navigator & {
+      wallets?: {
+        getWallets: () => Array<{
+          name: string;
+          icon: string;
+          features: {
+            'standard:connect': {
+              connect: () => Promise<Array<{ 
+                address: string;
+                publicKey?: Uint8Array;
+                label?: string;
+              }>>;
+            };
+            'standard:disconnect'?: {
+              disconnect: () => Promise<void>;
+            };
+          };
+        }>;
+      };
+    };
   }
 }
 
@@ -259,38 +279,115 @@ const LandingPage: React.FC = () => {
                   try {
                     console.log('🔗 Connecting to Solana wallet...');
                     
-                    // Try Wallet Standard first (modern approach) - Look for Backpack specifically
-                    if (typeof window !== 'undefined' && window.getWallets) {
-                      const wallets = window.getWallets();
-                      console.log('🔍 Available Wallet Standard wallets:', wallets.map(w => w.name));
-                      
-                      // Find Backpack wallet specifically
-                      const backpackWallet = wallets.find(w => 
-                        w.name.toLowerCase().includes('backpack')
-                      );
-                      
-                      if (backpackWallet) {
-                        console.log('🎯 Connecting to Backpack via Wallet Standard...');
-                        const accounts = await backpackWallet.features['standard:connect'].connect();
-                        if (accounts && accounts.length > 0) {
-                          console.log('✅ Connected via Wallet Standard:', accounts[0].address);
-                          toast.success('🎉 Backpack wallet connected successfully!');
-                          window.location.reload();
-                          return;
-                        }
-                      } else {
-                        console.log('🔍 Backpack not found in Wallet Standard, trying first available...');
-                        if (wallets.length > 0) {
-                          const accounts = await wallets[0].features['standard:connect'].connect();
-                          if (accounts && accounts.length > 0) {
-                            console.log('✅ Connected via Wallet Standard:', accounts[0].address);
-                            toast.success('🎉 Wallet connected successfully!');
+                    // Quick check: Try direct Backpack connection first if available
+                    if (typeof window !== 'undefined' && (window as any).backpack) {
+                      try {
+                        console.log('🎯 Found direct Backpack interface, attempting connection...');
+                        const backpackWallet = (window as any).backpack;
+                        if (backpackWallet.connect) {
+                          const result = await backpackWallet.connect();
+                          if (result && result.publicKey) {
+                            console.log('✅ Connected via direct Backpack interface:', result.publicKey.toString());
+                            toast.success('🎉 Backpack wallet connected successfully!');
                             window.location.reload();
                             return;
                           }
                         }
+                      } catch (e) {
+                        console.log('⚠️ Direct Backpack connection failed:', e);
                       }
                     }
+                    
+                    // Try multiple Wallet Standard detection approaches
+                    let walletStandardWallets: any[] = [];
+                    
+                    // Method 1: Check window.getWallets (some implementations)
+                    if (typeof window !== 'undefined' && window.getWallets) {
+                      try {
+                        walletStandardWallets = window.getWallets();
+                        console.log('🔍 Found wallets via window.getWallets:', walletStandardWallets.map(w => w.name));
+                      } catch (e) {
+                        console.log('⚠️ window.getWallets failed:', e);
+                      }
+                    }
+                    
+                    // Method 2: Check window.navigator.wallets (standard implementation)
+                    if (walletStandardWallets.length === 0 && typeof window !== 'undefined' && (window as any).navigator?.wallets) {
+                      try {
+                        walletStandardWallets = (window as any).navigator.wallets.getWallets();
+                        console.log('🔍 Found wallets via navigator.wallets:', walletStandardWallets.map(w => w.name));
+                      } catch (e) {
+                        console.log('⚠️ navigator.wallets failed:', e);
+                      }
+                    }
+                    
+                    // Method 2.5: Check global wallet registry
+                    if (walletStandardWallets.length === 0 && typeof window !== 'undefined' && (window as any).walletRegistry) {
+                      try {
+                        const registry = (window as any).walletRegistry;
+                        if (registry.getWallets) {
+                          walletStandardWallets = registry.getWallets();
+                          console.log('🔍 Found wallets via global registry:', walletStandardWallets.map(w => w.name));
+                        }
+                      } catch (e) {
+                        console.log('⚠️ Global wallet registry failed:', e);
+                      }
+                    }
+                    
+                    // Method 3: Event-based detection (more complex but standard compliant)
+                    if (walletStandardWallets.length === 0 && typeof window !== 'undefined') {
+                      console.log('🔍 Trying wallet event detection...');
+                      try {
+                        const walletEvent = new Event('wallet-standard:get-wallets');
+                        const eventWallets: any[] = [];
+                        
+                        // Listen for wallet registration events
+                        const handleWalletRegister = (event: any) => {
+                          if (event.detail && event.detail.wallet) {
+                            eventWallets.push(event.detail.wallet);
+                          }
+                        };
+                        
+                        window.addEventListener('wallet-standard:register-wallet', handleWalletRegister);
+                        window.dispatchEvent(walletEvent);
+                        
+                        // Give it a moment to register
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        window.removeEventListener('wallet-standard:register-wallet', handleWalletRegister);
+                        
+                        if (eventWallets.length > 0) {
+                          walletStandardWallets = eventWallets;
+                          console.log('🔍 Found wallets via events:', walletStandardWallets.map(w => w.name));
+                        }
+                      } catch (e) {
+                        console.log('⚠️ Event-based detection failed:', e);
+                      }
+                    }
+                    
+                    // Try to connect using Wallet Standard
+                    if (walletStandardWallets.length > 0) {
+                      console.log('🎯 Attempting Wallet Standard connection...');
+                      
+                      // Find Backpack wallet specifically
+                      const backpackWallet = walletStandardWallets.find(w => 
+                        w.name && w.name.toLowerCase().includes('backpack')
+                      );
+                      
+                      const targetWallet = backpackWallet || walletStandardWallets[0];
+                      
+                      if (targetWallet && targetWallet.features && targetWallet.features['standard:connect']) {
+                        console.log(`🎯 Connecting to ${targetWallet.name} via Wallet Standard...`);
+                        const accounts = await targetWallet.features['standard:connect'].connect();
+                        if (accounts && accounts.length > 0) {
+                          console.log('✅ Connected via Wallet Standard:', accounts[0].address);
+                          toast.success(`🎉 ${targetWallet.name} wallet connected successfully!`);
+                          window.location.reload();
+                          return;
+                        }
+                      }
+                    }
+                    
+                    console.log('🔄 Wallet Standard detection failed, trying legacy interface...');
                     
                     // Fallback to legacy window.solana interface
                     if (typeof window !== 'undefined' && window.solana) {

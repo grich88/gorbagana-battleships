@@ -27,6 +27,14 @@ declare global {
       disconnect: () => Promise<void>;
       isConnected: boolean;
     };
+    getWallets?: () => Array<{
+      name: string;
+      features: {
+        'standard:connect': {
+          connect: () => Promise<Array<{ address: string }>>;
+        };
+      };
+    }>;
   }
 }
 
@@ -223,33 +231,60 @@ const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* Primary wallet button */}
-              <WalletMultiButton className="!bg-white !text-green-600 hover:!bg-green-50 !border-0 !rounded-lg !font-semibold !transition-all !duration-200 !shadow-lg hover:!shadow-xl !px-6 !py-3" />
+              {/* Primary wallet button (Wallet Adapter) */}
+              <WalletMultiButton 
+                style={{
+                  backgroundColor: 'white',
+                  color: '#059669',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontWeight: '600',
+                  padding: '0.75rem 1.5rem',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease'
+                }}
+              />
               
-              {/* Fallback Custom Connect Button - Always visible */}
+              {/* Fallback Custom Connect Button - For Wallet Standard */}
               <button
                 onClick={async () => {
                   try {
-                    // Try to connect to any available Solana wallet
+                    console.log('🔗 Connecting to Solana wallet...');
+                    
+                    // Try Wallet Standard first (modern approach)
+                    if (typeof window !== 'undefined' && 'getWallets' in window) {
+                      const wallets = (window as any).getWallets();
+                      if (wallets && wallets.length > 0) {
+                        const wallet = wallets[0];
+                        console.log('🎯 Using Wallet Standard:', wallet.name);
+                        const accounts = await wallet.features['standard:connect'].connect();
+                        if (accounts && accounts.length > 0) {
+                          console.log('✅ Connected via Wallet Standard:', accounts[0].address);
+                          toast.success('🎉 Wallet connected successfully!');
+                          window.location.reload();
+                          return;
+                        }
+                      }
+                    }
+                    
+                    // Fallback to legacy window.solana interface
                     if (typeof window !== 'undefined' && window.solana) {
-                      console.log('🔗 Connecting to Solana wallet...');
+                      console.log('🔄 Trying legacy Solana interface...');
                       const response = await window.solana.connect();
-                      console.log('✅ Connected:', response.publicKey.toString());
+                      console.log('✅ Connected via legacy interface:', response.publicKey.toString());
                       toast.success('🎉 Wallet connected successfully!');
-                      // Force page refresh to update wallet state
                       window.location.reload();
                     } else {
                       console.log('❌ No Solana wallet detected');
                       toast.error('❌ No Solana wallet found! Please install Backpack, Phantom, or Solflare.');
-                      // Open wallet installation guide
                       window.open('https://backpack.app/', '_blank');
                     }
                   } catch (error: any) {
                     console.error('❌ Wallet connection failed:', error);
-                    if (error.code === 4001) {
+                    if (error.code === 4001 || error.message?.includes('rejected')) {
                       toast.error('❌ Wallet connection rejected by user');
                     } else {
-                      toast.error('❌ Failed to connect wallet: ' + error.message);
+                      toast.error('❌ Failed to connect wallet. Please try the WalletMultiButton if available.');
                     }
                   }
                 }}

@@ -114,6 +114,16 @@ const LandingPage: React.FC = () => {
   const [isPublicGame, setIsPublicGame] = useState(false);
   const [showPublicLobby, setShowPublicLobby] = useState(false);
 
+  // DEBUG: Log wallet connection state
+  useEffect(() => {
+    console.log('🔍 WALLET DEBUG:', {
+      connected,
+      publicKey: publicKey?.toString(),
+      wallet: wallet?.adapter?.name,
+      timestamp: new Date().toISOString()
+    });
+  }, [connected, publicKey, wallet]);
+
   // Check for game ID in URL params on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -395,7 +405,14 @@ const LandingPage: React.FC = () => {
                   
                   <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6 max-w-lg mx-auto">
                     <p className="text-red-800 font-medium mb-4">🔗 Connect your wallet to start playing</p>
-                    <div className="flex justify-center">
+                    
+                    {/* DEBUG: Always visible test button */}
+                    <div className="mb-4 p-2 bg-yellow-200 border border-yellow-400 rounded">
+                      <p className="text-xs text-yellow-800">DEBUG: This section should always be visible when NOT connected</p>
+                      <p className="text-xs text-yellow-800">Connected: {connected ? 'YES' : 'NO'} | PublicKey: {publicKey ? 'EXISTS' : 'NONE'}</p>
+                    </div>
+                    
+                    <div className="flex justify-center gap-2">
                       <WalletMultiButton 
                         style={{
                           backgroundColor: '#059669',
@@ -409,6 +426,17 @@ const LandingPage: React.FC = () => {
                           fontSize: '1rem'
                         }}
                       />
+                      
+                      {/* DEBUG: Fallback button */}
+                      <button 
+                        onClick={() => {
+                          console.log('🔘 FALLBACK BUTTON CLICKED');
+                          toast('🔘 Fallback button works! Check console for wallet debug info.');
+                        }}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg"
+                      >
+                        TEST
+                      </button>
                     </div>
                   </div>
                 </div>

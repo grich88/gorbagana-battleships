@@ -106,7 +106,7 @@ const SimpleWalletButton: React.FC<{ style?: React.CSSProperties; className?: st
 };
 
 const LandingPage: React.FC = () => {
-  const { publicKey, connected, disconnect } = useWallet();
+  const { publicKey, connected, disconnect, wallet, connect } = useWallet();
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>('standard');
   const [wagerAmount, setWagerAmount] = useState<number>(0.002);
   const [gameIdInput, setGameIdInput] = useState<string>('');
@@ -126,6 +126,35 @@ const LandingPage: React.FC = () => {
       }
     }
   }, []);
+
+  // Check for wallet connection state changes
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    // Only check if not already connected via wallet adapter
+    if (!connected && typeof window !== 'undefined') {
+      intervalId = setInterval(async () => {
+        // Check if wallet is connected externally
+        if (window.solana?.isConnected) {
+          console.log('🔄 Detected external wallet connection, syncing with adapter...');
+          try {
+            if (wallet && connect) {
+              await connect();
+              console.log('✅ Synced wallet connection with adapter');
+            }
+          } catch (error) {
+            console.log('ℹ️ Wallet adapter sync failed, but external connection detected');
+          }
+        }
+      }, 1000); // Check every second
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [connected, wallet, connect]);
 
   const startGame = (mode: GameMode) => {
     if (!publicKey) {
@@ -279,19 +308,33 @@ const LandingPage: React.FC = () => {
                   try {
                     console.log('🔗 Connecting to Solana wallet...');
                     
+                    // First, try using the wallet adapter if available
+                    if (wallet && connect) {
+                      try {
+                        console.log('🎯 Trying wallet adapter connection first...');
+                        await connect();
+                        console.log('✅ Connected via wallet adapter!');
+                        toast.success('🎉 Wallet connected successfully!');
+                        return;
+                      } catch (adapterError: any) {
+                        console.log('⚠️ Wallet adapter connection failed:', adapterError.message);
+                        console.log('🔄 Falling back to direct wallet methods...');
+                      }
+                    }
+                    
                     // Quick check: Try direct Backpack connection first if available
                     if (typeof window !== 'undefined' && (window as any).backpack) {
                       try {
                         console.log('🎯 Found direct Backpack interface, attempting connection...');
                         const backpackWallet = (window as any).backpack;
                         if (backpackWallet.connect) {
-                          const result = await backpackWallet.connect();
-                          if (result && result.publicKey) {
-                            console.log('✅ Connected via direct Backpack interface:', result.publicKey.toString());
-                            toast.success('🎉 Backpack wallet connected successfully!');
-                            window.location.reload();
-                            return;
-                          }
+                                                     const result = await backpackWallet.connect();
+                           if (result && result.publicKey) {
+                             console.log('✅ Connected via direct Backpack interface:', result.publicKey.toString());
+                             toast.success('🎉 Backpack wallet connected successfully!');
+                             // Don't reload - let the wallet adapter detect the connection
+                             return;
+                           }
                         }
                       } catch (e) {
                         console.log('⚠️ Direct Backpack connection failed:', e);
@@ -378,12 +421,12 @@ const LandingPage: React.FC = () => {
                       if (targetWallet && targetWallet.features && targetWallet.features['standard:connect']) {
                         console.log(`🎯 Connecting to ${targetWallet.name} via Wallet Standard...`);
                         const accounts = await targetWallet.features['standard:connect'].connect();
-                        if (accounts && accounts.length > 0) {
-                          console.log('✅ Connected via Wallet Standard:', accounts[0].address);
-                          toast.success(`🎉 ${targetWallet.name} wallet connected successfully!`);
-                          window.location.reload();
-                          return;
-                        }
+                                                 if (accounts && accounts.length > 0) {
+                           console.log('✅ Connected via Wallet Standard:', accounts[0].address);
+                           toast.success(`🎉 ${targetWallet.name} wallet connected successfully!`);
+                           // Don't reload - let the wallet adapter detect the connection
+                           return;
+                         }
                       }
                     }
                     
@@ -395,7 +438,7 @@ const LandingPage: React.FC = () => {
                       const response = await window.solana.connect();
                       console.log('✅ Connected via legacy interface:', response.publicKey.toString());
                       toast.success('🎉 Wallet connected successfully!');
-                      window.location.reload();
+                      // Don't reload - let the wallet adapter detect the connection
                     } else {
                       console.log('❌ No Solana wallet detected');
                       toast.error('❌ No Solana wallet found! Please install Backpack wallet.');

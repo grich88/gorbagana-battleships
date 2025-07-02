@@ -179,7 +179,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     >
       <SolanaWalletProvider 
         wallets={wallets} 
-        autoConnect={false}
+        autoConnect={true}
         onError={(error) => {
           console.error('Wallet error:', error);
           if (error.message.includes('User rejected')) {

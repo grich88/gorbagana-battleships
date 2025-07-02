@@ -17,7 +17,7 @@ import WalletBalance from './WalletBalance';
 import PublicGamesLobby from './PublicGamesLobby';
 import { GAME_MODES, GameMode } from '../lib/battleshipUtils';
 
-// Type declaration for Solana wallet
+// Type declaration for Solana wallet and Wallet Standard
 declare global {
   interface Window {
     solana?: {
@@ -29,9 +29,17 @@ declare global {
     };
     getWallets?: () => Array<{
       name: string;
+      icon: string;
       features: {
         'standard:connect': {
-          connect: () => Promise<Array<{ address: string }>>;
+          connect: () => Promise<Array<{ 
+            address: string;
+            publicKey?: Uint8Array;
+            label?: string;
+          }>>;
+        };
+        'standard:disconnect'?: {
+          disconnect: () => Promise<void>;
         };
       };
     }>;
@@ -251,18 +259,35 @@ const LandingPage: React.FC = () => {
                   try {
                     console.log('🔗 Connecting to Solana wallet...');
                     
-                    // Try Wallet Standard first (modern approach)
-                    if (typeof window !== 'undefined' && 'getWallets' in window) {
-                      const wallets = (window as any).getWallets();
-                      if (wallets && wallets.length > 0) {
-                        const wallet = wallets[0];
-                        console.log('🎯 Using Wallet Standard:', wallet.name);
-                        const accounts = await wallet.features['standard:connect'].connect();
+                    // Try Wallet Standard first (modern approach) - Look for Backpack specifically
+                    if (typeof window !== 'undefined' && window.getWallets) {
+                      const wallets = window.getWallets();
+                      console.log('🔍 Available Wallet Standard wallets:', wallets.map(w => w.name));
+                      
+                      // Find Backpack wallet specifically
+                      const backpackWallet = wallets.find(w => 
+                        w.name.toLowerCase().includes('backpack')
+                      );
+                      
+                      if (backpackWallet) {
+                        console.log('🎯 Connecting to Backpack via Wallet Standard...');
+                        const accounts = await backpackWallet.features['standard:connect'].connect();
                         if (accounts && accounts.length > 0) {
                           console.log('✅ Connected via Wallet Standard:', accounts[0].address);
-                          toast.success('🎉 Wallet connected successfully!');
+                          toast.success('🎉 Backpack wallet connected successfully!');
                           window.location.reload();
                           return;
+                        }
+                      } else {
+                        console.log('🔍 Backpack not found in Wallet Standard, trying first available...');
+                        if (wallets.length > 0) {
+                          const accounts = await wallets[0].features['standard:connect'].connect();
+                          if (accounts && accounts.length > 0) {
+                            console.log('✅ Connected via Wallet Standard:', accounts[0].address);
+                            toast.success('🎉 Wallet connected successfully!');
+                            window.location.reload();
+                            return;
+                          }
                         }
                       }
                     }
@@ -276,15 +301,24 @@ const LandingPage: React.FC = () => {
                       window.location.reload();
                     } else {
                       console.log('❌ No Solana wallet detected');
-                      toast.error('❌ No Solana wallet found! Please install Backpack, Phantom, or Solflare.');
+                      toast.error('❌ No Solana wallet found! Please install Backpack wallet.');
                       window.open('https://backpack.app/', '_blank');
                     }
                   } catch (error: any) {
                     console.error('❌ Wallet connection failed:', error);
+                    console.error('❌ Error details:', {
+                      message: error.message,
+                      code: error.code,
+                      name: error.name,
+                      stack: error.stack
+                    });
+                    
                     if (error.code === 4001 || error.message?.includes('rejected')) {
                       toast.error('❌ Wallet connection rejected by user');
+                    } else if (error.message?.includes('standard:connect')) {
+                      toast.error('❌ Wallet Standard connection failed. Try refreshing the page.');
                     } else {
-                      toast.error('❌ Failed to connect wallet. Please try the WalletMultiButton if available.');
+                      toast.error(`❌ Connection failed: ${error.message || 'Unknown error'}`);
                     }
                   }
                 }}

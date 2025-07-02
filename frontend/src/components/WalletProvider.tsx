@@ -116,17 +116,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const wallets = useMemo(() => {
     try {
-      // Load available wallet adapters
+      // Since Backpack now uses Wallet Standard, we'll keep adapters minimal
+      // to avoid conflicts with the new standard
       const adapters = [
-        new BackpackWalletAdapter(), // Backpack is installed and optimal for Gorbagana
+        new BackpackWalletAdapter(), // Keep for compatibility, but Wallet Standard takes precedence
       ];
       
       console.log(`🔗 Loaded ${adapters.length} wallet adapter(s): ${adapters.map(w => w.name).join(', ')}`);
       console.log('✅ Backpack wallet detected - optimal for Gorbagana');
+      console.log('ℹ️ Note: Backpack now uses Wallet Standard API - manual connection available');
       
       return adapters;
     } catch (error) {
       console.warn('⚠️ Error loading wallet adapters:', error);
+      // Return empty array to rely entirely on Wallet Standard
       return [];
     }
   }, []);

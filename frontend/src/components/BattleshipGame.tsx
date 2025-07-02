@@ -67,9 +67,9 @@ const SYNC_INTERVAL = 5000; // Sync with storage every 5 seconds
 const BattleshipGame: React.FC = () => {
   const { publicKey } = useWallet();
 
-  // Game mode state
+  // Game mode state - Initialize with standard mode to prevent loops
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>('standard');
-  const [showGameModeSelector, setShowGameModeSelector] = useState(true);
+  const [showGameModeSelector, setShowGameModeSelector] = useState(false); // Start hidden to prevent loop
 
   // Game state
   const [gamePhase, setGamePhase] = useState<GamePhase>('setup'); // Start in setup phase for mode selection
@@ -276,15 +276,24 @@ const BattleshipGame: React.FC = () => {
 
   // Enhanced game creation with Gorbagana blockchain integration
   const createNewGame = async () => {
+    console.log('🚢 CREATE NEW GAME - Starting process...');
+    console.log('🚢 Game Phase:', gamePhase);
+    console.log('🚢 Player Board Length:', playerBoard.length);
+    console.log('🚢 Ships to Place Length:', shipsToPlace.length);
+    console.log('🚢 All Ships Placed:', shipsToPlace.every(ship => ship.placed));
+    
     if (!publicKey) {
       toast.error('Please connect your wallet first');
       return;
     }
 
     if (!validateFleetConfiguration(playerBoard)) {
+      console.log('❌ Fleet validation failed');
       toast.error('Please place all ships before starting');
       return;
     }
+    
+    console.log('✅ Fleet validation passed - creating game...');
 
     setLoading(true);
     try {
@@ -362,7 +371,11 @@ const BattleshipGame: React.FC = () => {
       setGameShareUrl(shareUrl);
       
       toast.success('Game created! Share with your opponent 🚢');
+      
+      // Ensure proper state transitions
+      setShowGameModeSelector(false); // Force hide game mode selector
       setGamePhase('waiting');
+      console.log('✅ Game created successfully, moving to waiting phase');
     } catch (error) {
       console.error('Error creating game:', error);
       toast.error('Failed to create game');
@@ -1107,18 +1120,34 @@ const BattleshipGame: React.FC = () => {
           <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent mb-4">Ready to Start Playing?</h2>
-              <p className="text-gray-600">Choose your battle mode to begin your naval conquest!</p>
+              <p className="text-gray-600">You're all set to start collecting trash on the blockchain!</p>
             </div>
             
             <div className="flex flex-col items-center space-y-4">
-                                  <button
-                      onClick={() => setShowGameModeSelector(true)}
-                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 text-lg"
-                    >
-                      <Trash2 className="w-6 h-6" />
-                      🚛 START TRASH COLLECTION
-                    </button>
-                                    <p className="text-sm text-gray-500">Select collection mode • Deploy garbage trucks • Collect for victory!</p>
+              <button
+                onClick={() => {
+                  // Skip mode selector and go straight to setup since we already have standard mode
+                  console.log('🚛 Quick start with standard mode');
+                  setSelectedGameMode('standard');
+                  initializeGameForMode('standard');
+                  setShowGameModeSelector(false);
+                  setGamePhase('setup');
+                }}
+                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 text-lg"
+              >
+                <Trash2 className="w-6 h-6" />
+                🚛 START STANDARD COLLECTION
+              </button>
+              
+              <button
+                onClick={() => setShowGameModeSelector(true)}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Choose Different Mode
+              </button>
+              
+              <p className="text-sm text-gray-500">Standard mode • Deploy 5 garbage trucks • Collect for victory!</p>
             </div>
           </div>
         )}
@@ -1174,12 +1203,20 @@ const BattleshipGame: React.FC = () => {
                   
                   <button
                     onClick={() => {
+                      console.log('🗑️ Deploy Fleet clicked - Current mode:', selectedGameMode);
+                      // Ensure we have a valid game mode
                       if (!selectedGameMode) {
-                        setShowGameModeSelector(true);
-                        toast.error('Please select a game mode first');
-                        return;
+                        console.log('❌ No game mode selected, defaulting to standard');
+                        setSelectedGameMode('standard');
+                        initializeGameForMode('standard');
                       }
+                      
+                      // Force hide game mode selector
+                      setShowGameModeSelector(false);
+                      
+                      // Go to placement phase
                       setGamePhase('placement');
+                      console.log('✅ Moving to placement phase');
                     }}
                     disabled={loading}
                     className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

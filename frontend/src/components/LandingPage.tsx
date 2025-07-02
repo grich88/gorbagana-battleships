@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
 import { 
   Trash2, Truck, Waves, Compass, Target, Trophy, Users, 
@@ -280,19 +279,8 @@ const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* Simple, proven wallet connection - no custom logic needed */}
-              <WalletMultiButton 
-                style={{
-                  backgroundColor: 'white',
-                  color: '#059669',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontWeight: '600',
-                  padding: '0.75rem 1.5rem',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                  transition: 'all 0.2s ease'
-                }}
-              />
+              {/* REMOVED: WalletMultiButton - not rendering properly */}
+              <p className="text-white text-sm opacity-75">Main wallet button moved to page content below</p>
             </div>
           </div>
         </div>
@@ -344,7 +332,12 @@ const LandingPage: React.FC = () => {
               {/* Wallet Connection - Only show when connected */}
               {connected && (
                 <div className="wallet-connection-area">
-                  <WalletMultiButton className="!bg-gradient-to-r !from-green-600 !to-emerald-600 hover:!from-green-700 hover:!to-emerald-700 !border-0 !rounded-lg !font-semibold !text-white !transition-all !duration-200 !shadow-lg hover:!shadow-xl !px-6 !py-3" />
+                  <button
+                    onClick={() => disconnect()}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 border-0 rounded-lg font-semibold text-white transition-all duration-200 shadow-lg hover:shadow-xl px-6 py-3"
+                  >
+                    🔗 {publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)} 
+                  </button>
                 </div>
               )}
             </div>
@@ -432,26 +425,51 @@ const LandingPage: React.FC = () => {
                     </div>
                     
                     <div className="flex justify-center gap-2">
-                      {/* DEBUG: Check if WalletMultiButton renders */}
-                      <div className="p-2 bg-green-200 border border-green-400 rounded">
-                        <p className="text-xs text-green-800 mb-2">WalletMultiButton should appear below:</p>
-                        <WalletMultiButton 
-                          style={{
-                            backgroundColor: '#059669',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '0.75rem',
-                            fontWeight: '600',
-                            padding: '0.75rem 2rem',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.2s ease',
-                            fontSize: '1rem'
-                          }}
-                        />
-                        <p className="text-xs text-green-800 mt-2">If you only see this text, WalletMultiButton failed to render</p>
-                      </div>
+                      {/* FIX: Custom Connect Button - WalletMultiButton fails to render */}
+                      <button
+                        onClick={async () => {
+                          try {
+                            console.log('🔗 Manual wallet connection attempt...');
+                            
+                            // Try direct wallet adapter connection
+                            if (connect) {
+                              console.log('🎯 Using wallet adapter connect...');
+                              await connect();
+                              console.log('✅ Wallet connected via adapter!');
+                              toast.success('🎉 Wallet connected successfully!');
+                            } else {
+                              console.log('⚠️ No connect function available');
+                              
+                              // Fallback to window.solana
+                              if (typeof window !== 'undefined' && window.solana) {
+                                console.log('🔄 Trying window.solana fallback...');
+                                const response = await window.solana.connect();
+                                console.log('✅ Connected via window.solana:', response.publicKey.toString());
+                                toast.success('🎉 Wallet connected via fallback!');
+                                
+                                // Force refresh to sync state
+                                setTimeout(() => window.location.reload(), 1000);
+                              } else {
+                                console.log('❌ No wallet detected');
+                                toast.error('❌ No wallet found! Please install Backpack wallet.');
+                                window.open('https://backpack.app/', '_blank');
+                              }
+                            }
+                          } catch (error: any) {
+                            console.error('❌ Wallet connection failed:', error);
+                            if (error.code === 4001 || error.message?.includes('rejected')) {
+                              toast.error('❌ Wallet connection rejected by user');
+                            } else {
+                              toast.error(`❌ Connection failed: ${error.message}`);
+                            }
+                          }
+                        }}
+                        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+                      >
+                        🔗 Connect Wallet
+                      </button>
                       
-                      {/* DEBUG: Fallback button */}
+                      {/* DEBUG: Keep test button for debugging */}
                       <button 
                         onClick={() => {
                           console.log('🔘 FALLBACK BUTTON CLICKED');

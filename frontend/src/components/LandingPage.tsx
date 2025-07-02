@@ -443,6 +443,12 @@ const LandingPage: React.FC = () => {
                               if (backpackWallet) {
                                 console.log('🔍 Selecting Backpack wallet...');
                                 select(backpackWallet.adapter.name);
+                                
+                                // Wait a bit for selection to process
+                                console.log('⏳ Waiting for wallet selection to process...');
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                                
+                                // Try to connect
                                 await connect();
                                 console.log('✅ Wallet connected via adapter!');
                                 toast.success('🎉 Wallet connected successfully!');
@@ -452,28 +458,38 @@ const LandingPage: React.FC = () => {
                               }
                             } else {
                               console.log('⚠️ Wallet adapter method not available, trying direct connection...');
+                              throw new Error('Adapter method failed, switching to direct connection');
+                            }
+                          } catch (error: any) {
+                            console.error('❌ Wallet adapter connection failed:', error);
+                            
+                            // Try direct window.solana connection as fallback
+                            try {
+                              console.log('🔄 Trying direct window.solana connection...');
                               
-                              // Direct window.solana connection (most reliable)
-                              if (typeof window !== 'undefined' && window.solana) {
-                                console.log('🔄 Trying direct window.solana connection...');
+                              if (typeof window !== 'undefined' && window.solana && window.solana.isBackpack) {
                                 const response = await window.solana.connect();
                                 console.log('✅ Connected via window.solana:', response.publicKey.toString());
                                 toast.success('🎉 Wallet connected successfully!');
                                 
                                 // Force refresh to sync state
-                                setTimeout(() => window.location.reload(), 1000);
+                                setTimeout(() => {
+                                  console.log('🔄 Refreshing to sync wallet state...');
+                                  window.location.reload();
+                                }, 1000);
                               } else {
-                                console.log('❌ No wallet detected');
-                                toast.error('❌ No Backpack wallet found! Please install Backpack wallet.');
+                                throw new Error('No Backpack wallet available');
+                              }
+                            } catch (directError: any) {
+                              console.error('❌ Direct connection also failed:', directError);
+                              
+                              if (error.code === 4001 || error.message?.includes('rejected') || directError.code === 4001) {
+                                toast.error('❌ Wallet connection rejected by user');
+                              } else {
+                                toast.error('❌ Unable to connect wallet. Please ensure Backpack is installed and unlocked.');
+                                console.log('💡 Opening Backpack download page...');
                                 window.open('https://backpack.app/', '_blank');
                               }
-                            }
-                          } catch (error: any) {
-                            console.error('❌ Wallet connection failed:', error);
-                            if (error.code === 4001 || error.message?.includes('rejected')) {
-                              toast.error('❌ Wallet connection rejected by user');
-                            } else {
-                              toast.error(`❌ Connection failed: ${error.message}`);
                             }
                           }
                         }}

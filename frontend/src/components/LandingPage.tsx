@@ -17,6 +17,19 @@ import WalletBalance from './WalletBalance';
 import PublicGamesLobby from './PublicGamesLobby';
 import { GAME_MODES, GameMode } from '../lib/battleshipUtils';
 
+// Type declaration for Solana wallet
+declare global {
+  interface Window {
+    solana?: {
+      isPhantom?: boolean;
+      isBackpack?: boolean;
+      connect: () => Promise<{ publicKey: { toString: () => string } }>;
+      disconnect: () => Promise<void>;
+      isConnected: boolean;
+    };
+  }
+}
+
 // Simple wallet connect fallback component
 const SimpleWalletButton: React.FC<{ style?: React.CSSProperties; className?: string }> = ({ style, className }) => {
   const { connect, wallet, wallets, select } = useWallet();
@@ -210,7 +223,40 @@ const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Primary wallet button */}
               <WalletMultiButton className="!bg-white !text-green-600 hover:!bg-green-50 !border-0 !rounded-lg !font-semibold !transition-all !duration-200 !shadow-lg hover:!shadow-xl !px-6 !py-3" />
+              
+              {/* Fallback Custom Connect Button - Always visible */}
+              <button
+                onClick={async () => {
+                  try {
+                    // Try to connect to any available Solana wallet
+                    if (typeof window !== 'undefined' && window.solana) {
+                      console.log('🔗 Connecting to Solana wallet...');
+                      const response = await window.solana.connect();
+                      console.log('✅ Connected:', response.publicKey.toString());
+                      toast.success('🎉 Wallet connected successfully!');
+                      // Force page refresh to update wallet state
+                      window.location.reload();
+                    } else {
+                      console.log('❌ No Solana wallet detected');
+                      toast.error('❌ No Solana wallet found! Please install Backpack, Phantom, or Solflare.');
+                      // Open wallet installation guide
+                      window.open('https://backpack.app/', '_blank');
+                    }
+                  } catch (error: any) {
+                    console.error('❌ Wallet connection failed:', error);
+                    if (error.code === 4001) {
+                      toast.error('❌ Wallet connection rejected by user');
+                    } else {
+                      toast.error('❌ Failed to connect wallet: ' + error.message);
+                    }
+                  }
+                }}
+                className="bg-white text-green-600 hover:bg-green-50 border-0 rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl px-6 py-3 cursor-pointer"
+              >
+                🔗 Connect Wallet
+              </button>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BOARD_SIZE, coordToIndex, formatCoordinate } from '../lib/battleshipUtils';
+import { getBoardSize, coordToIndex, formatCoordinate } from '../lib/battleshipUtils';
 
 interface GameBoardProps {
   board: number[];
@@ -24,7 +24,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   onCellClick,
   showShips = true,
   hoveredShip,
-  boardSize = BOARD_SIZE
+  boardSize = 10
 }) => {
   const getCellClass = (x: number, y: number): string => {
     const index = coordToIndex(x, y, boardSize);

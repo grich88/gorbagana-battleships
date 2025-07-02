@@ -5,6 +5,9 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
+// Import available wallet adapters
+import { BackpackWalletAdapter } from '@solana/wallet-adapter-backpack';
+
 // Gorbagana Configuration - OFFICIAL ENDPOINT
 const RPC_ENDPOINTS = [
   'https://rpc.gorbagana.wtf/', // PRIMARY: Official Gorbagana RPC
@@ -111,7 +114,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     initializeEndpoint();
   }, []);
 
-  const wallets = useMemo(() => [], []); // Empty for auto-detection
+  const wallets = useMemo(() => {
+    try {
+      // Load available wallet adapters
+      const adapters = [
+        new BackpackWalletAdapter(), // Backpack is installed and optimal for Gorbagana
+      ];
+      
+      console.log(`🔗 Loaded ${adapters.length} wallet adapter(s): ${adapters.map(w => w.name).join(', ')}`);
+      console.log('✅ Backpack wallet detected - optimal for Gorbagana');
+      
+      return adapters;
+    } catch (error) {
+      console.warn('⚠️ Error loading wallet adapters:', error);
+      return [];
+    }
+  }, []);
 
   if (isTestingRPC) {
     return (

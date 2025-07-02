@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
-import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Trash2, Settings, Trophy, Waves, Compass, Target, Truck, DollarSign, AlertTriangle } from 'lucide-react';
+import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Trash2, Settings, Trophy, Waves, Compass, Target, Truck, DollarSign, AlertTriangle, Anchor, Ship } from 'lucide-react';
 
 import GameBoard from './GameBoard';
 import GorbaganaFaucet from './GorbaganaFaucet';
@@ -44,10 +44,10 @@ import {
 // Enhanced game storage
 import { 
   battleshipGameStorage, 
-  BattleshipGame, 
   convertToBattleshipGame, 
   convertFromBattleshipGame 
 } from '../lib/gameStorage';
+import type { BattleshipGame } from '../lib/gameStorage';
 
 // Gorbagana blockchain service for escrow
 import { GorbaganaBlockchainService } from '../lib/gorbaganaService';
@@ -264,14 +264,10 @@ const BattleshipGame: React.FC = () => {
     if (gameState && publicKey) {
       const role = getCurrentPlayerRole(gameState, publicKey.toString());
       
-      if (!gameState.isInitialized) {
+      if (gameState.status === 'waiting') {
         setGamePhase('waiting');
-      } else if (gameState.isGameOver) {
-        if (gameState.player1Revealed && gameState.player2Revealed) {
-          setGamePhase('finished');
-        } else {
-          setGamePhase('reveal');
-        }
+      } else if (gameState.status === 'finished') {
+        setGamePhase('finished');
       } else {
         setGamePhase('playing');
       }
@@ -330,7 +326,7 @@ const BattleshipGame: React.FC = () => {
           console.error('❌ Failed to create escrow:', escrowError);
           // Continue with game creation but mark escrow as failed
           escrowStatus = 'failed';
-          toast.warning('⚠️ Game created but escrow failed - playing without wager');
+          toast('⚠️ Game created but escrow failed - playing without wager', { icon: '⚠️' });
         }
       }
       
@@ -340,7 +336,7 @@ const BattleshipGame: React.FC = () => {
         player1: publicKey.toString(),
         player1Board: playerBoard,
         player1Salt: salt,
-        player1Commitment: Array.from(commitment),
+        player1Commitment: Array.from(commitment, x => Number(x)),
         turn: 1,
         boardHits1: new Array(boardSize).fill(0),
         boardHits2: new Array(boardSize).fill(0),
@@ -350,9 +346,8 @@ const BattleshipGame: React.FC = () => {
         isPublic: isPublicGame,
         creatorName: 'Captain ' + publicKey.toString().slice(0, 6),
         phase: 'waiting',
-        wagerAmount: wagerAmount,
+        wager: wagerAmount,
         escrowAccount: escrowAccount,
-        escrowStatus: escrowStatus,
       };
 
       // Save to enhanced storage system
@@ -360,7 +355,7 @@ const BattleshipGame: React.FC = () => {
       setBattleshipGame(newBattleshipGame);
       
       // Save locally for backward compatibility
-      saveGameState(gameId, playerBoard, salt);
+      // Game state will be saved via battleshipGameStorage
       
       // Generate share URL using the game ID
       const shareUrl = `${window.location.origin}${window.location.pathname}?game=${gameId}`;
@@ -403,21 +398,19 @@ const BattleshipGame: React.FC = () => {
       }
 
       // Add player 2 to escrow if there's a wager
-      let updatedEscrowStatus = battleshipGameData.escrowStatus;
-      if (battleshipGameData.wagerAmount > 0 && battleshipGameData.escrowAccount) {
+      if (battleshipGameData.wager && battleshipGameData.wager > 0 && battleshipGameData.escrowAccount) {
         try {
-          console.log(`💰 Adding player 2 to escrow for ${battleshipGameData.wagerAmount} GOR wager`);
+          console.log(`💰 Adding player 2 to escrow for ${battleshipGameData.wager} GOR wager`);
           const gorbaganaService = new GorbaganaBlockchainService();
           await gorbaganaService.getEscrowService().addPlayerToEscrow(
             battleshipGameData.escrowAccount,
             publicKey.toString()
           );
-          updatedEscrowStatus = 'active';
           console.log(`✅ Player 2 added to escrow account: ${battleshipGameData.escrowAccount}`);
-          toast.success(`🔒 Joined escrow with ${battleshipGameData.wagerAmount} GOR stake`);
+          toast.success(`🔒 Joined escrow with ${battleshipGameData.wager} GOR stake`);
         } catch (escrowError) {
           console.error('❌ Failed to join escrow:', escrowError);
-          toast.warning('⚠️ Joined game but escrow join failed');
+          toast('⚠️ Joined game but escrow join failed', { icon: '⚠️' });
         }
       }
 
@@ -427,18 +420,17 @@ const BattleshipGame: React.FC = () => {
         player2: publicKey.toString(),
         player2Board: playerBoard,
         player2Salt: salt,
-        player2Commitment: Array.from(commitment),
+        player2Commitment: Array.from(commitment, x => Number(x)),
         status: 'playing',
         updatedAt: Date.now(),
         phase: 'playing',
-        escrowStatus: updatedEscrowStatus,
       };
 
       await battleshipGameStorage.saveGame(battleshipGameData);
       setBattleshipGame(battleshipGameData);
       
       // Save locally for backward compatibility
-      saveGameState(gameIdInput, playerBoard, salt);
+      // Game state will be saved via battleshipGameStorage
       
       toast.success('Joined game successfully! ⚓');
       setGamePhase('playing');
@@ -542,8 +534,9 @@ const BattleshipGame: React.FC = () => {
       return;
     }
 
-    // Place ship using utility function
-    const newBoard = placeShip(playerBoard, x, y, currentShip.length, shipOrientation, getBoardSize());
+    // Place ship using utility function  
+    const newBoard = [...playerBoard];
+    placeShip(newBoard, x, y, currentShip.length, shipOrientation, getBoardSize());
     setPlayerBoard(newBoard);
     
     // Mark ship as placed
@@ -601,6 +594,11 @@ const BattleshipGame: React.FC = () => {
     try {
       // Determine if shot was a hit based on opponent's board
       const opponentBoard = isPlayer1 ? battleshipGame.player2Board : battleshipGame.player1Board;
+      if (!opponentBoard) {
+        toast.error('Opponent board not available');
+        return;
+      }
+      
       const wasHit = opponentBoard[index] === 1;
 
       // Update hits array
@@ -622,25 +620,25 @@ const BattleshipGame: React.FC = () => {
         winnerAddress = publicKey.toString();
         
         // Handle escrow payout for winner
-        if (battleshipGame.wagerAmount > 0 && battleshipGame.escrowAccount) {
+        if (battleshipGame.wager && battleshipGame.wager > 0 && battleshipGame.escrowAccount) {
           try {
-            console.log(`🏆 Game won! Processing payout for ${battleshipGame.wagerAmount * 2} GOR`);
+            console.log(`🏆 Game won! Processing payout for ${battleshipGame.wager * 2} GOR`);
             const gorbaganaService = new GorbaganaBlockchainService();
             const payoutResult = await gorbaganaService.completeGameWithPayouts(
               battleshipGame.id,
               winnerAddress,
               battleshipGame.player1,
               battleshipGame.player2 || '',
-              battleshipGame.wagerAmount,
+              battleshipGame.wager,
               battleshipGame.escrowAccount
             );
             
             if (payoutResult.success) {
-              toast.success(`🎉 Victory! ${battleshipGame.wagerAmount * 2} GOR transferred to your wallet!`);
+              toast.success(`🎉 Victory! ${battleshipGame.wager * 2} GOR transferred to your wallet!`);
             }
           } catch (payoutError) {
             console.error('❌ Payout failed:', payoutError);
-            toast.warning('🏆 You won! But payout processing failed.');
+            toast('🏆 You won! But payout processing failed.', { icon: '⚠️' });
           }
         }
         
@@ -653,7 +651,7 @@ const BattleshipGame: React.FC = () => {
         [isPlayer1 ? 'boardHits2' : 'boardHits1']: newHits,
         turn: gameWon ? battleshipGame.turn : (isPlayer1 ? 2 : 1), // Don't switch turns if game is won
         status: gameStatus,
-        phase: gamePhase,
+        phase: gamePhase as 'setup' | 'placement' | 'waiting' | 'playing' | 'reveal' | 'finished',
         winner: gameWon ? (isPlayer1 ? 1 : 2) : undefined,
         updatedAt: Date.now(),
       };
@@ -771,8 +769,8 @@ const BattleshipGame: React.FC = () => {
       console.log(`🚪 Abandoning game ${battleshipGame.id}`);
       
       // Handle escrow refunds if there's a wager
-      if (battleshipGame.wagerAmount && battleshipGame.wagerAmount > 0) {
-        console.log(`💰 Processing refunds for abandoned game with ${battleshipGame.wagerAmount} GOR wager`);
+      if (battleshipGame.wager && battleshipGame.wager > 0) {
+        console.log(`💰 Processing refunds for abandoned game with ${battleshipGame.wager} GOR wager`);
         
         // Initialize Gorbagana service for escrow handling
         const gorbaganaService = new GorbaganaBlockchainService();
@@ -780,7 +778,7 @@ const BattleshipGame: React.FC = () => {
         try {
           const playerA = battleshipGame.player1;
           const playerB = battleshipGame.player2;
-          const wagerAmount = battleshipGame.wagerAmount;
+          const wagerAmount = battleshipGame.wager;
           
           let refundResults;
           if (playerB) {
@@ -1424,9 +1422,9 @@ const BattleshipGame: React.FC = () => {
                 {/* Game status */}
                 <div className="text-sm text-gray-500">
                   <p>⏳ Waiting for player 2 to join...</p>
-                  {battleshipGame.wagerAmount > 0 && (
-                    <p className="text-orange-600 font-medium">💰 Wager: {battleshipGame.wagerAmount} GOR • Escrow: {battleshipGame.escrowStatus}</p>
-                  )}
+                                  {battleshipGame.wager && battleshipGame.wager > 0 && (
+                  <p className="text-orange-600 font-medium">💰 Wager: {battleshipGame.wager} GOR</p>
+                )}
                   {battleshipGame.isPublic && <p>📢 Public game</p>}
                 </div>
               </div>
@@ -1644,16 +1642,13 @@ const BattleshipGame: React.FC = () => {
               </div>
 
               {/* Payout information */}
-              {battleshipGame.wagerAmount > 0 && (
+              {battleshipGame.wager && battleshipGame.wager > 0 && (
                 <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6 mb-6">
                   <h4 className="font-bold text-gray-800 mb-3">💰 Prize Pool</h4>
                   {battleshipGame.winner && (
                     <div className="space-y-2">
                       <p className="text-lg font-semibold text-orange-600">
-                        Winner Takes: {(battleshipGame.wagerAmount * 2).toFixed(4)} GOR
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Escrow Status: {battleshipGame.escrowStatus}
+                        Winner Takes: {(battleshipGame.wager * 2).toFixed(4)} GOR
                       </p>
                       {((battleshipGame.winner === 1 && battleshipGame.player1 === publicKey!.toString()) ||
                         (battleshipGame.winner === 2 && battleshipGame.player2 === publicKey!.toString())) && (
@@ -1663,7 +1658,7 @@ const BattleshipGame: React.FC = () => {
                   )}
                   {!battleshipGame.winner && (
                     <p className="text-gray-600">
-                      Draw - Each player refunded {battleshipGame.wagerAmount.toFixed(4)} GOR
+                      Draw - Each player refunded {battleshipGame.wager.toFixed(4)} GOR
                     </p>
                   )}
                 </div>

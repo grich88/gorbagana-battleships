@@ -4,6 +4,7 @@ import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@sol
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { SHOW_DEBUG_INFO } from '../lib/config';
 
 // Gorbagana Testnet Configuration (from working trash-tac-toe)
 // CACHE BUST v2.1 - OFFICIAL RPC ENDPOINT - 2025-01-29
@@ -14,11 +15,12 @@ const RPC_ENDPOINTS = [
 
 const DEPLOYMENT_TIMESTAMP = '🔥 GORBAGANA-BATTLESHIP-v2.1-WORKING-RPC-2025-01-29 🔥';
 const CACHE_BUST_ID = 'WORKING-GORBAGANA-RPC-v2.1-' + Date.now();
-console.log('🚀🚀🚀 BATTLESHIP v2.1 - WORKING GORBAGANA RPC LOADED');
-console.log('🎯 Primary RPC: https://rpc.gorbagana.wtf/');
-console.log('⚡ Fallback RPC: https://api.devnet.solana.com');
-console.log('⏰ DEPLOYMENT TIMESTAMP:', DEPLOYMENT_TIMESTAMP);
-console.log('🔄 CACHE BUST ID:', CACHE_BUST_ID);
+if (SHOW_DEBUG_INFO) {
+  console.log('🚀🚀🚀 BATTLESHIP v2.1 - WORKING GORBAGANA RPC LOADED');
+  console.log('🎯 Primary RPC: https://rpc.gorbagana.wtf/');
+  console.log('⚡ Fallback RPC: https://api.devnet.solana.com');
+  console.log('🔄 CACHE BUST ID:', CACHE_BUST_ID);
+}
 
 // Test RPC endpoint connectivity with better error handling (from working implementation)
 async function testRPCEndpoint(endpoint: string): Promise<boolean> {
@@ -187,19 +189,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       
       // Only warn about actual conflicts
       if ((hasMetaMask && hasAnyBackpack) || (hasRealPhantom && hasAnyBackpack)) {
-        console.warn('⚠️ Active wallet conflicts detected - this may cause transaction issues');
-        console.log('💡 For best experience with Gorbagana, disable conflicting wallets and use only Backpack');
+        if (SHOW_DEBUG_INFO) {
+          console.warn('⚠️ Active wallet conflicts detected - this may cause transaction issues');
+          console.log('💡 For best experience with Gorbagana, disable conflicting wallets and use only Backpack');
+        }
       }
       
       if (hasAnyBackpack) {
-        console.log('✅ Backpack detected and ready for Gorbagana');
-        if (isBackpackProvidingBothInterfaces) {
-          console.log('ℹ️ Backpack is providing both Ethereum and Solana interfaces (normal behavior)');
+        if (SHOW_DEBUG_INFO) {
+          console.log('✅ Backpack detected and ready for Gorbagana');
+          if (isBackpackProvidingBothInterfaces) {
+            console.log('ℹ️ Backpack is providing both Ethereum and Solana interfaces (normal behavior)');
+          }
         }
       } else if (window.solana) {
-        console.warn('⚠️ Non-Backpack Solana wallet detected - please use Backpack for best Gorbagana support');
+        if (SHOW_DEBUG_INFO) console.warn('⚠️ Non-Backpack Solana wallet detected - please use Backpack for best Gorbagana support');
       } else {
-        console.warn('⚠️ No Solana wallet detected - please install Backpack for Gorbagana support');
+        if (SHOW_DEBUG_INFO) console.warn('⚠️ No Solana wallet detected - please install Backpack for Gorbagana support');
       }
     };
 
@@ -209,16 +215,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize with primary Gorbagana endpoint
   useEffect(() => {
-    console.log(`🎯 Using Gorbagana endpoint: ${RPC_ENDPOINTS[0]} (official endpoint)`);
+    if (SHOW_DEBUG_INFO) console.log(`🎯 Using Gorbagana endpoint: ${RPC_ENDPOINTS[0]} (official endpoint)`);
     setWorkingEndpoint(RPC_ENDPOINTS[0]);
     setIsTestingRPC(false);
   }, []);
 
   // Empty wallets array - Backpack auto-detects (PROVEN WORKING CONFIG)
   const wallets = useMemo(() => {
-    console.log('🔗 Using empty wallets array - Backpack auto-detects via Wallet Standard');
-    console.log('✅ Backpack wallet detected - optimal for Gorbagana');
-    console.log('ℹ️ Note: Backpack now uses Wallet Standard API - manual connection available');
+    if (SHOW_DEBUG_INFO) {
+      console.log('🔗 Using empty wallets array - Backpack auto-detects via Wallet Standard');
+      console.log('✅ Backpack wallet detected - optimal for Gorbagana');
+      console.log('ℹ️ Note: Backpack now uses Wallet Standard API - manual connection available');
+    }
     return [];
   }, []);
 

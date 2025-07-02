@@ -65,7 +65,7 @@ const MAX_POLL_ATTEMPTS = 30; // 60 seconds total
 const SYNC_INTERVAL = 5000; // Sync with storage every 5 seconds
 
 const BattleshipGame: React.FC = () => {
-  const { publicKey } = useWallet();
+  const { publicKey, wallet } = useWallet();
 
   // Game mode state
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>('standard');
@@ -325,7 +325,8 @@ const BattleshipGame: React.FC = () => {
           const escrowResult = await gorbaganaService.getEscrowService().createEscrow(
             publicKey.toString(), 
             wagerAmount, 
-            gameId
+            gameId,
+            wallet
           );
           escrowAccount = escrowResult.account;
           escrowStatus = 'created';
@@ -417,7 +418,9 @@ const BattleshipGame: React.FC = () => {
           const gorbaganaService = new GorbaganaBlockchainService();
           await gorbaganaService.getEscrowService().addPlayerToEscrow(
             battleshipGameData.escrowAccount,
-            publicKey.toString()
+            publicKey.toString(),
+            battleshipGameData.wager,
+            wallet
           );
           console.log(`✅ Player 2 added to escrow account: ${battleshipGameData.escrowAccount}`);
           toast.success(`🔒 Joined escrow with ${battleshipGameData.wager} GOR stake`);
@@ -797,16 +800,27 @@ const BattleshipGame: React.FC = () => {
           
           let refundResults;
           if (playerB) {
-            // Both players joined - refund both
-            console.log('🔄 Both players joined - refunding both players');
-            refundResults = await gorbaganaService.handleAbandonedGame(
-              battleshipGame.id, 
-              playerA, 
-              playerB, 
-              wagerAmount, 
-              battleshipGame.escrowAccount
-            );
-            
+            // Both players joined - refund current user only
+            console.log('🔄 Both players joined - refunding current user only');
+            if (publicKey.toString() === playerA) {
+              refundResults = await gorbaganaService.getEscrowService().refundBothPlayers(
+                battleshipGame.id,
+                playerA,
+                playerB,
+                wagerAmount,
+                wallet,
+                null // Only current user can sign
+              );
+            } else if (publicKey.toString() === playerB) {
+              refundResults = await gorbaganaService.getEscrowService().refundBothPlayers(
+                battleshipGame.id,
+                playerA,
+                playerB,
+                wagerAmount,
+                null,
+                wallet // Only current user can sign
+              );
+            }
             if (Array.isArray(refundResults)) {
               const successfulRefunds = refundResults.filter(r => r.success).length;
               toast.success(`🔄 ${successfulRefunds}/2 players refunded their ${wagerAmount} GOR wager`);
@@ -814,14 +828,12 @@ const BattleshipGame: React.FC = () => {
           } else {
             // Only creator joined - refund creator
             console.log('🔄 Only creator joined - refunding creator');
-            refundResults = await gorbaganaService.handleAbandonedGame(
-              battleshipGame.id, 
-              playerA, 
-              null, 
-              wagerAmount, 
-              battleshipGame.escrowAccount
+            refundResults = await gorbaganaService.getEscrowService().refundSinglePlayer(
+              battleshipGame.id,
+              playerA,
+              wagerAmount,
+              wallet
             );
-            
             if (refundResults.success) {
               toast.success(`🔄 ${wagerAmount} GOR wager refunded to creator`);
             }

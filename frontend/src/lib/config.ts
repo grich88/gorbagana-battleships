@@ -105,4 +105,6 @@ export const getAPIBaseURL = (): string => {
   return BATTLESHIP_CONFIG.API.BASE_URL;
 };
 
+export const SHOW_DEBUG_INFO = BATTLESHIP_CONFIG.UI.SHOW_DEBUG_INFO;
+
 export default BATTLESHIP_CONFIG; 

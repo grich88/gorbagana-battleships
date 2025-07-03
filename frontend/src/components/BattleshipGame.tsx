@@ -900,8 +900,6 @@ const BattleshipGame: React.FC = () => {
     selectedGameMode
   });
 
-
-
   // Show wallet connection screen if not connected
   if (!publicKey) {
     return (

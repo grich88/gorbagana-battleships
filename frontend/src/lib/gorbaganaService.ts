@@ -329,13 +329,15 @@ class GorbaganaBlockchainService {
       // Try Gorbagana-specific balance method
       let balance = 0;
       try {
-        balance = await this.makeRpcCall('getBalance', [address]);
+        const raw = await this.makeRpcCall('getBalance', [address]);
+        balance = (typeof raw === 'number' && !isNaN(raw)) ? raw : 0;
       } catch (error) {
         // If getBalance doesn't work, try alternative methods
         console.warn('⚠️ Standard getBalance failed, trying alternative...');
         try {
           const accountInfo = await this.makeRpcCall('getAccountInfo', [address]);
-          balance = accountInfo?.lamports || 0;
+          const lamports = accountInfo?.lamports;
+          balance = (typeof lamports === 'number' && !isNaN(lamports)) ? lamports : 0;
         } catch (altError) {
           console.warn('⚠️ Alternative balance check failed, returning 0');
           balance = 0;
@@ -366,7 +368,8 @@ class GorbaganaBlockchainService {
 
   // Format balance from raw units to GOR
   private formatBalance(rawBalance: number): string {
-    const gor = rawBalance / Math.pow(10, GORBAGANA_CONSTANTS.DECIMALS);
+    const safeBalance = (typeof rawBalance === 'number' && !isNaN(rawBalance)) ? rawBalance : 0;
+    const gor = safeBalance / Math.pow(10, GORBAGANA_CONSTANTS.DECIMALS);
     return `${gor.toFixed(6)} ${GORBAGANA_CONSTANTS.SYMBOL}`;
   }
 

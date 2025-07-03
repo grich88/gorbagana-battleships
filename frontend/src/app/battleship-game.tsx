@@ -492,11 +492,14 @@ export default function TrashCombatGame() {
       
       const isGameCreator = game.playerA === wallet.publicKey.toBase58();
       
-      // Check if any moves have been made
-      const noMovesYet = game.playerABoard.every(row => 
-        row.every(cell => cell === 'empty')
-      ) && game.playerBBoard.every(row => 
-        row.every(cell => cell === 'empty')
+      // Check if any moves have been made (handle different board property formats)
+      const playerABoard = game.playerABoard || (game.playerA && game.playerA.board);
+      const playerBBoard = game.playerBBoard || (game.playerB && game.playerB.board);
+      
+      const noMovesYet = playerABoard && playerABoard.every && playerABoard.every(row => 
+        row && row.every && row.every(cell => cell === 'empty')
+      ) && playerBBoard && playerBBoard.every && playerBBoard.every(row => 
+        row && row.every && row.every(cell => cell === 'empty')
       );
       
       if (noMovesYet) {
@@ -703,8 +706,8 @@ export default function TrashCombatGame() {
     setLoading(true);
     
     try {
-      // Create game ID
-      const newGameId = crypto.randomUUID();
+      // Create game ID (4 digits)
+      const newGameId = Math.floor(1000 + Math.random() * 9000).toString();
       
       // Create escrow deposit
       const { escrowAccount, txSignature } = await createEscrowDeposit(wagerAmount, newGameId, true);
@@ -851,7 +854,7 @@ export default function TrashCombatGame() {
   const renderBoard = (board: CellState[][], isPlayerBoard: boolean = true, allowClicks: boolean = false) => {
     return (
       <div 
-        className="grid gap-0.5 p-4 bg-green-900 rounded-lg"
+        className="grid gap-0 p-2 bg-green-900 rounded-lg"
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, minmax(0, 1fr))` }}
       >
         {board.map((row, rowIndex) =>

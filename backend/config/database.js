@@ -21,14 +21,11 @@ const connectDB = async () => {
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);
     
-    // In development, continue without database (use in-memory fallback)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('⚠️ Running in development mode - continuing without MongoDB');
-      return null;
-    }
-    
-    // In production, exit if no database connection
-    process.exit(1);
+    // TEMPORARY: Continue with in-memory fallback even in production
+    // TODO: Fix MongoDB authentication and re-enable production exit
+    console.log('⚠️ FALLBACK: Using in-memory storage due to MongoDB connection failure');
+    console.log('🔧 Backend will continue running with temporary storage');
+    return null;
   }
 };
 

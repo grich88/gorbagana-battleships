@@ -589,7 +589,6 @@ app.post('/api/games/:gameId/join', async (req, res) => {
       console.log(`💾 Saving game to MongoDB...`);
       await game.save();
       console.log(`✅ Game saved successfully to MongoDB`);
-    }
     } else {
       // Update in-memory storage
       game.playerB = playerAddress;

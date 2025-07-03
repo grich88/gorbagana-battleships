@@ -11,10 +11,7 @@ const PORT = process.env.PORT || 3002;
 console.log('🚀 GORBAGANA TRASH COMBAT BACKEND v2.0 STARTING...');
 console.log('🔥 REBUILD USING PROVEN PATTERNS FROM WORKING TRASH TAC TOE');
 console.log(`🔥 DEPLOYMENT TIMESTAMP: ${new Date().toISOString()}`);
-console.log('🌐 CORS enabled for origins:', process.env.NODE_ENV === 'production' 
-  ? 'https://your-trash-combat-app.netlify.app' 
-  : 'http://localhost:3000, https://your-trash-combat-app.netlify.app'
-);
+console.log('🌐 CORS enabled for origins:', process.env.CORS_ORIGIN || 'http://localhost:3000');
 
 // Database connection status
 let dbConnected = false;
@@ -75,11 +72,14 @@ const setupDatabaseCleanup = () => {
 };
 
 // Middleware
+const allowedOrigins = [
+  'http://localhost:3000',
+  process.env.CORS_ORIGIN,
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://your-trash-combat-app.netlify.app'
-  ],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());

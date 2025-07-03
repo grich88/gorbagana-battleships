@@ -919,29 +919,42 @@ app.post('/api/games/:gameId/abandon', async (req, res) => {
 // Forfeit garbage war (opponent wins)
 app.post('/api/games/:gameId/forfeit', async (req, res) => {
   try {
+    console.log(`🏳️ FORFEIT REQUEST: gameId=${req.params.gameId}, body=`, JSON.stringify(req.body, null, 2));
+    
     const { gameId } = req.params;
     const { playerAddress, winner, reason } = req.body;
+    
+    console.log(`🔍 Looking for game ${gameId} using ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
+    console.log(`🎯 Request params: playerAddress=${playerAddress}, winner=${winner}, reason=${reason}`);
     
     let game;
     
     if (dbConnected) {
       // Use MongoDB
+      console.log(`📊 MongoDB query: Game.findOne({ id: "${gameId}" })`);
       game = await Game.findOne({ id: gameId });
+      console.log(`📊 MongoDB result:`, game ? `Found game with status=${game.status}` : 'No game found');
     } else {
       // Use in-memory storage
       game = games.get(gameId);
+      console.log(`💾 In-memory result:`, game ? `Found game with status=${game.status}` : 'No game found');
     }
     
     if (!game) {
+      console.log(`❌ Game ${gameId} not found in ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
       return res.status(404).json({ 
         success: false, 
         error: 'Garbage war not found' 
       });
     }
     
+    console.log(`✅ Game ${gameId} found, checking player validation...`);
+    
     // Check if player is in this game (handle both storage types)
     const playerAKey = dbConnected ? game.playerA?.publicKey : game.playerA;
     const playerBKey = dbConnected ? game.playerB?.publicKey : game.playerB;
+    
+    console.log(`🔍 Player validation: playerA=${playerAKey}, playerB=${playerBKey}, requesting=${playerAddress}`);
     
     if (playerAKey !== playerAddress && playerBKey !== playerAddress) {
       return res.status(400).json({ 
@@ -951,13 +964,18 @@ app.post('/api/games/:gameId/forfeit', async (req, res) => {
     }
     
     // Set opponent as winner
+    console.log(`🏁 Setting game as finished - winner: ${winner}`);
     game.status = 'finished';
     game.winner = winner;
     game.abandonReason = reason || 'Player forfeited';
     game.updatedAt = Date.now();
     
     if (dbConnected) {
+      console.log(`💾 Saving forfeit to MongoDB...`);
       await game.save();
+      console.log(`✅ Forfeit saved successfully to MongoDB`);
+    } else {
+      console.log(`💾 Forfeit saved to in-memory storage`);
     }
     
     console.log(`🏳️ Garbage war ${gameId} forfeited by ${playerAddress} - Winner: ${winner}`);
@@ -970,6 +988,12 @@ app.post('/api/games/:gameId/forfeit', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error forfeiting garbage war:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error details:', {
+      message: error.message,
+      name: error.name,
+      code: error.code
+    });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to forfeit garbage war: ' + error.message 

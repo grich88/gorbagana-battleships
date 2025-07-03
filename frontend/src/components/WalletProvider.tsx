@@ -22,37 +22,60 @@ console.log('✅ Using proven patterns from working Trash Tac Toe app');
 console.log('🌐 Official Gorbagana RPC:', RPC_ENDPOINTS[0]);
 console.log('⏰ Deployment:', DEPLOYMENT_TIMESTAMP);
 
-// Test RPC endpoint connectivity (from working app)
+// ROBUST RPC endpoint connectivity testing
 async function testRPCEndpoint(endpoint: string): Promise<boolean> {
   try {
     console.log(`🔍 Testing RPC endpoint: ${endpoint}`);
     
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getHealth',
-        params: []
-      }),
-      signal: AbortSignal.timeout(8000)
-    });
-    
-    const isWorking = response.ok;
-    console.log(`${isWorking ? '✅' : '❌'} ${endpoint}: ${response.status}`);
-    return isWorking;
-    
-  } catch (error: any) {
-    console.warn(`❌ RPC endpoint ${endpoint} failed:`, error.message);
-    
-    // For Gorbagana endpoints, be more lenient with timeouts
-    if (endpoint.includes('gorbagana') && error.name === 'AbortError') {
-      console.log(`⏰ Gorbagana endpoint ${endpoint} timed out, but will still try to use it`);
-      return true;
+    // Special handling for Gorbagana - always try to use it first
+    if (endpoint.includes('gorbagana')) {
+      console.log(`🔥 GORBAGANA PRIMARY: Always attempting connection to official network`);
+      
+      // Quick ping test with longer timeout for Gorbagana
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getHealth',
+          params: []
+        }),
+        signal: AbortSignal.timeout(15000) // 15 seconds for Gorbagana
+      });
+      
+      if (response.ok) {
+        console.log(`✅ ${endpoint}: ${response.status} - GORBAGANA CONNECTED!`);
+        return true;
+      }
+    } else {
+      // Standard test for fallback endpoints
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getHealth',
+          params: []
+        }),
+        signal: AbortSignal.timeout(5000) // 5 seconds for fallbacks
+      });
+      
+      const isWorking = response.ok;
+      console.log(`${isWorking ? '✅' : '❌'} ${endpoint}: ${response.status}`);
+      return isWorking;
     }
     
-    return false;
+  } catch (error: any) {
+    if (endpoint.includes('gorbagana')) {
+      console.warn(`⏰ Gorbagana endpoint timeout - but still using it (your $GOR is there!)`);
+      console.log(`🔥 FORCING GORBAGANA CONNECTION: ${endpoint}`);
+      return true; // ALWAYS use Gorbagana even if test fails
+    } else {
+      console.warn(`❌ RPC endpoint ${endpoint} failed:`, error.message);
+      return false;
+    }
   }
 }
 

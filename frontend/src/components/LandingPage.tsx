@@ -210,19 +210,13 @@ const LandingPage: React.FC = () => {
   // If user is in full game mode, show the complete game interface
   if (showFullGame) {
     return (
-      <div className="relative">
-        {/* Back to Landing Button */}
-        <div className="fixed top-4 left-4 z-50">
-          <button
-            onClick={() => setShowFullGame(false)}
-            className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 hover:bg-white hover:shadow-lg transition-all duration-200 flex items-center gap-2"
-          >
-            <ArrowRight className="w-4 h-4 rotate-180" />
-            Back to The Landfill
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-100 via-teal-50 to-blue-100">
+        <div className="w-full max-w-4xl mx-auto mt-8">
+          <button onClick={() => setShowFullGame(false)} className="mb-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 hover:bg-white hover:shadow-lg transition-all duration-200 flex items-center gap-2">
+            ← Back
           </button>
+          <BattleshipGame />
         </div>
-        
-        <BattleshipGame />
       </div>
     );
   }
@@ -263,29 +257,89 @@ const LandingPage: React.FC = () => {
   const gradientBg = 'bg-gradient-to-br from-emerald-100 via-teal-50 to-blue-100';
   const cardBg = 'bg-white/80 backdrop-blur-sm';
 
-  return (
-    <div className={`min-h-screen ${gradientBg} relative overflow-hidden`}>
-      {/* Prominent Wallet Connection Banner - Show at top when not connected */}
-      {!connected && (
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-4 shadow-lg">
-          <div className="container mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-2 rounded-full">
-                <Trash2 className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg">🔗 Connect Your Wallet to Start Playing</h3>
-                <p className="text-green-100 text-sm">Deploy your garbage trucks and start collecting!</p>
-              </div>
+  if (!connected) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-100 via-teal-50 to-blue-100">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 p-12 max-w-lg w-full text-center">
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-green-100 to-emerald-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Trash2 className="w-12 h-12 text-green-600" />
             </div>
-            <div className="flex items-center gap-3">
-              {/* REMOVED: WalletMultiButton - not rendering properly */}
-              <p className="text-white text-sm opacity-75">Main wallet button moved to page content below</p>
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-4">
+              Welcome to The Landfill
+            </h2>
+            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+              Deploy your garbage trucks in strategic formations and compete in the ultimate waste collection battle on the Gorchain blockchain!
+            </p>
+            <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6 max-w-lg mx-auto">
+              <p className="text-red-800 font-medium mb-4">🔗 Connect your wallet to start playing</p>
+              <button
+                onClick={async () => {
+                  try {
+                    if (connect && select && wallets.length > 0) {
+                      const backpackWallet = wallets.find(w => w.adapter.name === 'Backpack');
+                      if (backpackWallet) {
+                        select(backpackWallet.adapter.name);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        await connect();
+                        toast.success('🎉 Wallet connected successfully!');
+                      } else {
+                        throw new Error('Backpack wallet not available');
+                      }
+                    } else {
+                      throw new Error('Adapter method failed, switching to direct connection');
+                    }
+                  } catch (error) {
+                    try {
+                      if (typeof window !== 'undefined' && window.solana && window.solana.isBackpack) {
+                        const response = await window.solana.connect();
+                        toast.success('🎉 Wallet connected successfully!');
+                        setTimeout(() => window.location.reload(), 1000);
+                      } else {
+                        throw new Error('No Backpack wallet available');
+                      }
+                    } catch (directError) {
+                      toast.error('❌ Unable to connect wallet. Please ensure Backpack is installed and unlocked.');
+                      window.open('https://backpack.app/', '_blank');
+                    }
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                🔗 Connect Wallet
+              </button>
+            </div>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="text-center p-6 bg-white rounded-lg border border-gray-200">
+              <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Zap className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="font-semibold text-gray-800 mb-2">Lightning Fast</h3>
+              <p className="text-sm text-gray-600">Quick waste collection battles powered by Gorchain</p>
+            </div>
+            <div className="text-center p-6 bg-white rounded-lg border border-gray-200">
+              <div className="bg-emerald-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h3 className="font-semibold text-gray-800 mb-2">Secure</h3>
+              <p className="text-sm text-gray-600">Waste management battles with proven blockchain security</p>
+            </div>
+            <div className="text-center p-6 bg-white rounded-lg border border-gray-200">
+              <div className="bg-teal-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trophy className="w-6 h-6 text-teal-600" />
+              </div>
+              <h3 className="font-semibold text-gray-800 mb-2">Competitive</h3>
+              <p className="text-sm text-gray-600">Win GOR tokens by outsmarting opponents in the landfill</p>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
+  return (
+    <div className={`min-h-screen ${gradientBg} relative overflow-hidden`}>
       {/* Floating Icons Animation */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-10 left-10 opacity-20 animate-bounce">
@@ -342,14 +396,6 @@ const LandingPage: React.FC = () => {
               )}
             </div>
           </nav>
-
-          {/* DEBUG: Show which state we're in */}
-          <div className="mb-4 p-4 bg-blue-100 border border-blue-300 rounded-lg text-center">
-            <h3 className="text-blue-800 font-bold">🔍 DEBUG: CURRENT STATE</h3>
-            <p className="text-blue-700">Connected: {connected ? 'YES' : 'NO'}</p>
-            <p className="text-blue-700">PublicKey: {publicKey ? publicKey.toString().slice(0, 8) + '...' : 'NONE'}</p>
-            <p className="text-blue-700">Showing: {connected ? 'CONNECTED VIEW' : 'NOT CONNECTED VIEW'}</p>
-          </div>
 
           {/* Main Content */}
           {connected ? (
@@ -417,12 +463,6 @@ const LandingPage: React.FC = () => {
                   
                   <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6 max-w-lg mx-auto">
                     <p className="text-red-800 font-medium mb-4">🔗 Connect your wallet to start playing</p>
-                    
-                    {/* DEBUG: Always visible test button */}
-                    <div className="mb-4 p-2 bg-yellow-200 border border-yellow-400 rounded">
-                      <p className="text-xs text-yellow-800">DEBUG: This section should always be visible when NOT connected</p>
-                      <p className="text-xs text-yellow-800">Connected: {connected ? 'YES' : 'NO'} | PublicKey: {publicKey ? 'EXISTS' : 'NONE'}</p>
-                    </div>
                     
                     <div className="flex justify-center gap-2">
                       {/* FIX: Custom Connect Button - WalletMultiButton fails to render */}
@@ -496,18 +536,6 @@ const LandingPage: React.FC = () => {
                         className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
                       >
                         🔗 Connect Wallet
-                      </button>
-                      
-                      {/* DEBUG: Keep test button for debugging */}
-                      <button 
-                        onClick={() => {
-                          console.log('🔘 FALLBACK BUTTON CLICKED');
-                          console.log('🔍 Current wallet state at click:', { connected, publicKey: publicKey?.toString(), wallet: wallet?.adapter?.name });
-                          toast('🔘 Fallback button works! Check console for wallet debug info.');
-                        }}
-                        className="bg-orange-600 text-white px-4 py-2 rounded-lg"
-                      >
-                        TEST
                       </button>
                     </div>
                   </div>

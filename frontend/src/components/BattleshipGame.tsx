@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import toast from 'react-hot-toast';
 import { Share2, Users, Copy, ExternalLink, RefreshCw, Gamepad2, ArrowLeft, Trash2, Settings, Trophy, Waves, Compass, Target, Truck, DollarSign, AlertTriangle, Anchor, Ship } from 'lucide-react';
@@ -66,6 +66,7 @@ const SYNC_INTERVAL = 5000; // Sync with storage every 5 seconds
 
 const BattleshipGame: React.FC = () => {
   const { publicKey, wallet } = useWallet();
+  const { connection } = useConnection();
 
   // Game mode state
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>('standard');
@@ -326,10 +327,13 @@ const BattleshipGame: React.FC = () => {
             publicKey.toString(), 
             wagerAmount, 
             gameId,
-            wallet
+            wallet,
+            connection
           );
           escrowAccount = escrowResult.account;
           escrowStatus = 'created';
+          // Store escrow private key for payout
+          localStorage.setItem(`battleship_escrow_privkey_${gameId}`, JSON.stringify(escrowResult.escrowPrivateKey));
           console.log(`✅ Escrow account created: ${escrowAccount}`);
           toast.success(`🔒 Escrow created for ${wagerAmount} GOR`);
         } catch (escrowError) {
@@ -420,7 +424,8 @@ const BattleshipGame: React.FC = () => {
             battleshipGameData.escrowAccount,
             publicKey.toString(),
             battleshipGameData.wager,
-            wallet
+            wallet,
+            connection
           );
           console.log(`✅ Player 2 added to escrow account: ${battleshipGameData.escrowAccount}`);
           toast.success(`🔒 Joined escrow with ${battleshipGameData.wager} GOR stake`);
@@ -797,30 +802,25 @@ const BattleshipGame: React.FC = () => {
           const playerA = battleshipGame.player1;
           const playerB = battleshipGame.player2;
           const wagerAmount = battleshipGame.wager;
-          
+          // Retrieve escrow private key from localStorage
+          const escrowPrivKeyStr = localStorage.getItem(`battleship_escrow_privkey_${battleshipGame.id}`);
+          if (!escrowPrivKeyStr) {
+            toast.error('Escrow private key not found. Only the game creator can process payout/refund.');
+            return;
+          }
+          const escrowPrivKey = JSON.parse(escrowPrivKeyStr);
           let refundResults;
           if (playerB) {
-            // Both players joined - refund current user only
-            console.log('🔄 Both players joined - refunding current user only');
-            if (publicKey.toString() === playerA) {
-              refundResults = await gorbaganaService.getEscrowService().refundBothPlayers(
-                battleshipGame.id,
-                playerA,
-                playerB,
-                wagerAmount,
-                wallet,
-                null // Only current user can sign
-              );
-            } else if (publicKey.toString() === playerB) {
-              refundResults = await gorbaganaService.getEscrowService().refundBothPlayers(
-                battleshipGame.id,
-                playerA,
-                playerB,
-                wagerAmount,
-                null,
-                wallet // Only current user can sign
-              );
-            }
+            // Both players joined - refund both
+            console.log('🔄 Both players joined - refunding both');
+            refundResults = await gorbaganaService.getEscrowService().refundBothPlayers(
+              battleshipGame.escrowAccount,
+              playerA,
+              playerB,
+              wagerAmount,
+              escrowPrivKey,
+              connection
+            );
             if (Array.isArray(refundResults)) {
               const successfulRefunds = refundResults.filter(r => r.success).length;
               toast.success(`🔄 ${successfulRefunds}/2 players refunded their ${wagerAmount} GOR wager`);
@@ -829,10 +829,11 @@ const BattleshipGame: React.FC = () => {
             // Only creator joined - refund creator
             console.log('🔄 Only creator joined - refunding creator');
             refundResults = await gorbaganaService.getEscrowService().refundSinglePlayer(
-              battleshipGame.id,
+              battleshipGame.escrowAccount,
               playerA,
               wagerAmount,
-              wallet
+              escrowPrivKey,
+              connection
             );
             if (refundResults.success) {
               toast.success(`🔄 ${wagerAmount} GOR wager refunded to creator`);

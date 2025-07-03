@@ -9,8 +9,7 @@ import { SHOW_DEBUG_INFO } from '../lib/config';
 // Gorbagana Testnet Configuration (from working trash-tac-toe)
 // CACHE BUST v2.1 - OFFICIAL RPC ENDPOINT - 2025-01-29
 const RPC_ENDPOINTS = [
-  'https://rpc.gorbagana.wtf/', // PRIMARY: Official Gorbagana RPC (proven working)
-  'https://api.devnet.solana.com', // FALLBACK: Solana devnet
+  'https://rpc.gorbagana.wtf/' // PRIMARY: Official Gorbagana RPC (proven working)
 ];
 
 const DEPLOYMENT_TIMESTAMP = '🔥 GORBAGANA-BATTLESHIP-v2.1-WORKING-RPC-2025-01-29 🔥';

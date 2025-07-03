@@ -1,7 +1,7 @@
 // Gorbagana Blockchain Service - Native Implementation
 // This service connects directly to the Gorbagana blockchain without Solana dependencies
 
-import { PublicKey, Connection, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { PublicKey, Connection, Transaction, SystemProgram, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
 
 interface GorbaganaConfig {
   endpoint?: string;
@@ -66,6 +66,8 @@ interface EscrowAccount {
   gameId: string;
   status: 'pending' | 'active' | 'completed' | 'refunded';
   createdAt: number;
+  txSignature?: string;
+  escrowPrivateKey?: number[];
 }
 
 interface RefundResult {
@@ -84,93 +86,104 @@ class GorbaganaEscrowService {
     this.timeout = timeout;
   }
 
-  // Create escrow account for game wager
-  async createEscrow(playerA: string, wagerAmount: number, gameId: string, wallet?: any): Promise<EscrowAccount> {
+  // Create escrow account for game wager (Solana-compatible)
+  async createEscrow(playerA: string, wagerAmount: number, gameId: string, wallet: any, connection: Connection): Promise<EscrowAccount> {
     try {
-      if (!wallet) throw new Error('Wallet connection required for escrow creation');
-      console.log(`🔒 Creating escrow for game ${gameId}`);
-      console.log(`💰 Wager amount: ${wagerAmount} GOR`);
-      console.log(`👤 Player A: ${playerA.slice(0, 8)}...`);
-
-      const escrowId = `escrow_${gameId}_${Date.now()}`;
+      if (!wallet || !wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet connection and signing required for escrow creation');
+      // Generate new escrow Keypair
+      const escrowKeypair = Keypair.generate();
+      const escrowPubkey = escrowKeypair.publicKey;
       const wagerLamports = Math.floor(wagerAmount * LAMPORTS_PER_SOL);
-      // For demo: use playerA as escrow address (replace with real PDA in production)
-      const escrowAddress = escrowId;
-
-      // Send GOR to escrow (real transaction)
-      const txResult = await gorbaganaServiceInstance?.sendTransaction(
-        playerA,
-        escrowAddress,
-        wagerLamports,
-        wallet
+      // Get recent blockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+      // Create transfer transaction
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey: escrowPubkey,
+          lamports: wagerLamports,
+        })
       );
-      if (!txResult?.success) throw new Error('Escrow transaction failed: ' + txResult?.error);
-
-      const escrowAccount: EscrowAccount = {
-        account: escrowAddress,
+      transaction.feePayer = wallet.publicKey;
+      transaction.recentBlockhash = blockhash;
+      // Request signature
+      const signedTx = await wallet.signTransaction(transaction);
+      // Send transaction
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), { skipPreflight: false });
+      // Confirm transaction
+      await connection.confirmTransaction(signature, 'confirmed');
+      // Return escrow account info
+      return {
+        account: escrowPubkey.toBase58(),
         balance: wagerLamports,
         playerA,
         gameId,
         status: 'pending',
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        txSignature: signature,
+        escrowPrivateKey: Array.from(escrowKeypair.secretKey), // For payout
       };
-      console.log(`✅ Escrow account created: ${escrowAddress}, tx: ${txResult.signature}`);
-      return escrowAccount;
     } catch (error) {
       console.error('❌ Failed to create escrow:', error);
       throw error;
     }
   }
 
-  // Add second player to escrow (when joining game)
-  async addPlayerToEscrow(escrowId: string, playerB: string, wagerAmount: number, wallet?: any): Promise<EscrowAccount> {
+  // Add second player to escrow (Player B deposit)
+  async addPlayerToEscrow(escrowAccount: string, playerB: string, wagerAmount: number, wallet: any, connection: Connection): Promise<EscrowAccount> {
     try {
-      if (!wallet) throw new Error('Wallet connection required for escrow join');
-      console.log(`🤝 Adding player B to escrow: ${escrowId}`);
-      console.log(`👤 Player B: ${playerB.slice(0, 8)}...`);
+      if (!wallet || !wallet.publicKey || !wallet.signTransaction) throw new Error('Wallet connection and signing required for escrow join');
+      const escrowPubkey = new PublicKey(escrowAccount);
       const wagerLamports = Math.floor(wagerAmount * LAMPORTS_PER_SOL);
-      // Send GOR to escrow (real transaction)
-      const txResult = await gorbaganaServiceInstance?.sendTransaction(
-        playerB,
-        escrowId,
-        wagerLamports,
-        wallet
+      const { blockhash } = await connection.getLatestBlockhash();
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey: escrowPubkey,
+          lamports: wagerLamports,
+        })
       );
-      if (!txResult?.success) throw new Error('Escrow join transaction failed: ' + txResult?.error);
-      const escrowAccount: EscrowAccount = {
-        account: escrowId,
-        balance: 0, // Would contain 2x wager amount
-        playerA: '', // Would be stored
+      transaction.feePayer = wallet.publicKey;
+      transaction.recentBlockhash = blockhash;
+      const signedTx = await wallet.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), { skipPreflight: false });
+      await connection.confirmTransaction(signature, 'confirmed');
+      return {
+        account: escrowAccount,
+        balance: wagerLamports,
         playerB,
-        gameId: escrowId.split('_')[1],
+        gameId: '', // Not needed for join
         status: 'active',
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        txSignature: signature,
       };
-      console.log(`✅ Player B added to escrow, status: active, tx: ${txResult.signature}`);
-      return escrowAccount;
     } catch (error) {
       console.error('❌ Failed to add player to escrow:', error);
       throw error;
     }
   }
 
-  // Release funds to winner
-  async releaseToWinner(escrowId: string, winner: string, amount: number, wallet?: any): Promise<RefundResult> {
+  // Release funds to winner (payout from escrow)
+  async releaseToWinner(escrowAccount: string, winner: string, amount: number, escrowPrivateKey: number[], connection: Connection): Promise<RefundResult> {
     try {
-      if (!wallet) throw new Error('Wallet connection required for payout');
-      console.log(`🏆 Releasing ${amount} GOR to winner: ${winner.slice(0, 8)}...`);
-      // Send GOR from escrow to winner (real transaction)
-      const txResult = await gorbaganaServiceInstance?.sendTransaction(
-        escrowId,
-        winner,
-        Math.floor(amount * LAMPORTS_PER_SOL),
-        wallet
+      const escrowKeypair = Keypair.fromSecretKey(Uint8Array.from(escrowPrivateKey));
+      const winnerPubkey = new PublicKey(winner);
+      const { blockhash } = await connection.getLatestBlockhash();
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: escrowKeypair.publicKey,
+          toPubkey: winnerPubkey,
+          lamports: Math.floor(amount * LAMPORTS_PER_SOL),
+        })
       );
-      if (!txResult?.success) throw new Error('Payout transaction failed: ' + txResult?.error);
-      console.log(`✅ Funds released to winner! Tx: ${txResult.signature}`);
+      transaction.feePayer = escrowKeypair.publicKey;
+      transaction.recentBlockhash = blockhash;
+      transaction.sign(escrowKeypair);
+      const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
+      await connection.confirmTransaction(signature, 'confirmed');
       return {
         success: true,
-        txSignature: txResult.signature,
+        txSignature: signature,
         amount
       };
     } catch (error) {
@@ -182,84 +195,52 @@ class GorbaganaEscrowService {
     }
   }
 
-  // Refund both players for abandoned/tied games
-  async refundBothPlayers(escrowId: string, playerA: string, playerB: string, amountEach: number, walletA?: any, walletB?: any): Promise<RefundResult[]> {
+  // Refund both players for abandoned/tied games (split escrow)
+  async refundBothPlayers(escrowAccount: string, playerA: string, playerB: string, amountEach: number, escrowPrivateKey: number[], connection: Connection): Promise<RefundResult[]> {
     try {
-      if (!walletA || !walletB) throw new Error('Wallets required for both player refunds');
-      console.log(`🔄 Refunding both players from escrow: ${escrowId}`);
-      console.log(`💰 Amount each: ${amountEach} GOR`);
-      const results: RefundResult[] = [];
-      // Refund Player A
-      try {
-        const txA = await gorbaganaServiceInstance?.sendTransaction(
-          escrowId,
-          playerA,
-          Math.floor(amountEach * LAMPORTS_PER_SOL),
-          walletA
-        );
-        if (!txA?.success) throw new Error('Refund A transaction failed: ' + txA?.error);
-        console.log(`✅ Refunded ${amountEach} GOR to Player A: ${playerA.slice(0, 8)}..., tx: ${txA.signature}`);
-        results.push({
-          success: true,
-          txSignature: txA.signature,
-          amount: amountEach
-        });
-      } catch (error) {
-        console.error('❌ Failed to refund Player A:', error);
-        results.push({
-          success: false,
-          error: error instanceof Error ? error.message : 'Refund failed'
-        });
-      }
-      // Refund Player B
-      try {
-        const txB = await gorbaganaServiceInstance?.sendTransaction(
-          escrowId,
-          playerB,
-          Math.floor(amountEach * LAMPORTS_PER_SOL),
-          walletB
-        );
-        if (!txB?.success) throw new Error('Refund B transaction failed: ' + txB?.error);
-        console.log(`✅ Refunded ${amountEach} GOR to Player B: ${playerB.slice(0, 8)}..., tx: ${txB.signature}`);
-        results.push({
-          success: true,
-          txSignature: txB.signature,
-          amount: amountEach
-        });
-      } catch (error) {
-        console.error('❌ Failed to refund Player B:', error);
-        results.push({
-          success: false,
-          error: error instanceof Error ? error.message : 'Refund failed'
-        });
-      }
-      return results;
+      const escrowKeypair = Keypair.fromSecretKey(Uint8Array.from(escrowPrivateKey));
+      const pubA = new PublicKey(playerA);
+      const pubB = new PublicKey(playerB);
+      const { blockhash } = await connection.getLatestBlockhash();
+      const transaction = new Transaction()
+        .add(SystemProgram.transfer({ fromPubkey: escrowKeypair.publicKey, toPubkey: pubA, lamports: Math.floor(amountEach * LAMPORTS_PER_SOL) }))
+        .add(SystemProgram.transfer({ fromPubkey: escrowKeypair.publicKey, toPubkey: pubB, lamports: Math.floor(amountEach * LAMPORTS_PER_SOL) }));
+      transaction.feePayer = escrowKeypair.publicKey;
+      transaction.recentBlockhash = blockhash;
+      transaction.sign(escrowKeypair);
+      const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
+      await connection.confirmTransaction(signature, 'confirmed');
+      return [
+        { success: true, txSignature: signature, amount: amountEach },
+        { success: true, txSignature: signature, amount: amountEach }
+      ];
     } catch (error) {
       console.error('❌ Failed to process refunds:', error);
-      return [{
-        success: false,
-        error: error instanceof Error ? error.message : 'Refund processing failed'
-      }];
+      return [{ success: false, error: error instanceof Error ? error.message : 'Refund processing failed' }];
     }
   }
 
   // Refund single player for abandoned game
-  async refundSinglePlayer(escrowId: string, player: string, amount: number, wallet?: any): Promise<RefundResult> {
+  async refundSinglePlayer(escrowAccount: string, player: string, amount: number, escrowPrivateKey: number[], connection: Connection): Promise<RefundResult> {
     try {
-      if (!wallet) throw new Error('Wallet required for single player refund');
-      console.log(`🔄 Refunding single player from escrow: ${escrowId}`);
-      console.log(`💰 Refund amount: ${amount} GOR to ${player.slice(0, 8)}...`);
-      const txResult = await gorbaganaServiceInstance?.sendTransaction(
-        escrowId,
-        player,
-        Math.floor(amount * LAMPORTS_PER_SOL),
-        wallet
+      const escrowKeypair = Keypair.fromSecretKey(Uint8Array.from(escrowPrivateKey));
+      const playerPubkey = new PublicKey(player);
+      const { blockhash } = await connection.getLatestBlockhash();
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: escrowKeypair.publicKey,
+          toPubkey: playerPubkey,
+          lamports: Math.floor(amount * LAMPORTS_PER_SOL),
+        })
       );
-      if (!txResult?.success) throw new Error('Single refund transaction failed: ' + txResult?.error);
-      console.log(`✅ Single player refund completed! Tx: ${txResult.signature}`);
+      transaction.feePayer = escrowKeypair.publicKey;
+      transaction.recentBlockhash = blockhash;
+      transaction.sign(escrowKeypair);
+      const signature = await connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false });
+      await connection.confirmTransaction(signature, 'confirmed');
       return {
         success: true,
-        txSignature: txResult.signature,
+        txSignature: signature,
         amount
       };
     } catch (error) {
@@ -607,10 +588,10 @@ class GorbaganaBlockchainServiceWithEscrow extends GorbaganaBlockchainService {
       if (winner) {
         // Winner takes all
         const totalAmount = wagerAmount * 2;
-        return await this.escrowService.releaseToWinner(escrowId, winner, totalAmount);
+        return await this.escrowService.releaseToWinner(escrowId, winner, totalAmount, [], this.connection);
       } else {
         // Tie - refund both players
-        return await this.escrowService.refundBothPlayers(escrowId, playerA, playerB, wagerAmount);
+        return await this.escrowService.refundBothPlayers(escrowId, playerA, playerB, wagerAmount, [], this.connection);
       }
     } catch (error) {
       console.error('❌ Failed to complete game with payouts:', error);
@@ -634,11 +615,11 @@ class GorbaganaBlockchainServiceWithEscrow extends GorbaganaBlockchainService {
       if (playerB) {
         // Both players joined - refund both
         console.log('🔄 Both players joined - refunding both');
-        return await this.escrowService.refundBothPlayers(escrowId, playerA, playerB, wagerAmount);
+        return await this.escrowService.refundBothPlayers(escrowId, playerA, playerB, wagerAmount, [], this.connection);
       } else {
         // Only creator joined - refund creator only
         console.log('🔄 Only creator joined - refunding creator');
-        return await this.escrowService.refundSinglePlayer(escrowId, playerA, wagerAmount);
+        return await this.escrowService.refundSinglePlayer(escrowId, playerA, wagerAmount, [], this.connection);
       }
     } catch (error) {
       console.error('❌ Failed to handle abandoned game:', error);

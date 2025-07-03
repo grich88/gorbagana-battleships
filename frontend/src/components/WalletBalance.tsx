@@ -25,13 +25,21 @@ const WalletBalance: React.FC<WalletBalanceProps> = ({
 
   // Fetch real GOR balance from Gorbagana RPC
   const fetchBalance = async () => {
-    if (!publicKey || !connected) return;
+    let walletAddress = '';
+    if (window.backpack && window.backpack.gorbagana && window.backpack.gorbagana.publicKey) {
+      walletAddress = window.backpack.gorbagana.publicKey;
+    } else if (publicKey && connected) {
+      walletAddress = publicKey.toString();
+    }
+    if (!walletAddress) {
+      toast.error('No Gorbagana wallet address found. Please ensure Backpack is connected and Gorbagana is enabled.');
+      setBalance(0);
+      return;
+    }
     setLoading(true);
     try {
-      const walletAddress = publicKey.toString();
       const gorbaganaService = new GorbaganaBlockchainService();
       const result = await gorbaganaService.getBalance(walletAddress);
-      // result.balance is in raw units, convert to GOR
       const gorBalance = result.balance / Math.pow(10, 6); // 6 decimals for GOR
       setBalance(gorBalance);
       toast.success('GOR balance loaded!', { duration: 2000, icon: '💰' });

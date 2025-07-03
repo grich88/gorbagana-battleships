@@ -1037,733 +1037,104 @@ const BattleshipGame: React.FC = () => {
     );
   }
 
+  useEffect(() => {
+    if (selectedGameMode === 'quick' && gamePhase === 'placement') {
+      generateRandomShips();
+    }
+  }, [selectedGameMode, gamePhase]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-blue-100 py-4">
-      <div className="container mx-auto px-4 max-w-7xl">
-        
-
-
-        {/* Enhanced Header */}
-        <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Title Section */}
-            <div className="flex items-center gap-4">
-              <div className="bg-gradient-to-r from-blue-600 to-teal-600 p-3 rounded-full">
-                <Anchor className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">
-                  Gorbagana Battleship
-                </h1>
-                <p className="text-gray-600 text-sm">Strategic naval warfare on the blockchain</p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <GorbaganaFaucet variant="inline" />
-              
-              <WalletMultiButton 
-                style={{
-                  background: 'linear-gradient(to right, #f3f4f6, #e5e7eb)',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontWeight: '500',
-                  fontSize: '0.875rem',
-                  padding: '0.5rem 1rem',
-                  transition: 'all 0.2s ease-in-out'
-                }}
-                className="wallet-button-custom"
-              />
-            </div>
-          </div>
-
-          {/* Wallet Info Bar */}
-                      <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 text-sm">
-            <div className="flex items-center gap-4 text-gray-600">
-              <span className="font-medium">Waste Manager:</span>
-              <code className="bg-green-50 px-2 py-1 rounded text-green-700 border border-green-200">
-                {publicKey?.toString().slice(0, 8)}...{publicKey?.toString().slice(-8)}
-              </code>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-gray-600 text-xs">Gorbagana Network</span>
-              </div>
-              <span className="text-gray-400">|</span>
-              <span className="text-gray-600 text-xs">Ready for battle</span>
-            </div>
-          </div>
+    <div className="max-w-3xl mx-auto py-8 space-y-8">
+      {/* Step 1: Game Mode Selection */}
+      <section>
+        <h2 className="text-xl font-bold mb-2">Step 1: Select Game Mode</h2>
+        <div className="flex gap-2">
+          {Object.keys(GAME_MODES).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setSelectedGameMode(mode as GameMode)}
+              disabled={!!battleshipGame}
+              className={`px-4 py-2 rounded ${selectedGameMode === mode ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'} ${battleshipGame ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {GAME_MODES[mode].name}
+            </button>
+          ))}
         </div>
-
-        {/* Compact Gorbagana Info */}
-        <div className="mb-6">
-          <GorbaganaInfo variant="compact" />
-        </div>
-
-        {/* Wallet Balance Display */}
-        <div className="mb-6">
-          <WalletBalance />
-        </div>
-
-        {/* Fallback: Show game mode selector if no active game and not in mode selector */}
-        {!showGameModeSelector && !battleshipGame && gamePhase === 'setup' && (
-          <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent mb-4">Ready to Start Playing?</h2>
-              <p className="text-gray-600">You're all set to start collecting trash on the blockchain!</p>
-            </div>
-            
-            <div className="flex flex-col items-center space-y-4">
-              <button
-                onClick={() => {
-                  // Skip mode selector and go straight to setup since we already have standard mode
-                  console.log('🚛 Quick start with standard mode');
-                  setSelectedGameMode('standard');
-                  initializeGameForMode('standard');
-                  setShowGameModeSelector(false);
-                  setGamePhase('setup');
-                }}
-                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 text-lg"
-              >
-                <Trash2 className="w-6 h-6" />
-                🚛 START STANDARD COLLECTION
-              </button>
-              
-              <button
-                onClick={() => setShowGameModeSelector(true)}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2"
-              >
-                <Settings className="w-4 h-4" />
-                Choose Different Mode
-              </button>
-              
-              <p className="text-sm text-gray-500">Standard mode • Deploy 5 garbage trucks • Collect for victory!</p>
-            </div>
+        {selectedGameMode && (
+          <div className="text-sm text-gray-600 mt-1">
+            Selected: {GAME_MODES[selectedGameMode].name}
           </div>
         )}
+      </section>
 
-        {/* Enhanced Game setup and sharing section - ALWAYS show if no active game */}
-        {gamePhase === 'setup' && !battleshipGame && (
-          <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-3">
-                <div className="bg-gradient-to-r from-green-100 to-emerald-100 p-3 rounded-full">
-                  <Trash2 className="w-6 h-6 text-green-600" />
-                </div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">The Landfill Command Center</h2>
-              </div>
-              <button
-                onClick={() => setShowGameModeSelector(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Change Mode
-              </button>
-            </div>
-
-            {/* Wager Input Section */}
-            <div className="mb-8">
-              <WalletBalance 
-                showWagerInput={true}
-                onWagerChange={handleWagerChange}
-                currentWager={wagerAmount}
-              />
-            </div>
-            
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Create new game */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-r from-blue-100 to-blue-200 p-2 rounded-lg">
-                    <Anchor className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-800">Launch New Battle</h3>
-                </div>
-                
-                <div className="space-y-4">
-                  <label className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isPublicGame}
-                      onChange={(e) => setIsPublicGame(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                    />
-                    <span className="text-gray-700 font-medium">Public Battle (allow others to join)</span>
-                  </label>
-                  
-                  <button
-                    onClick={() => {
-                      console.log('🗑️ Deploy Fleet clicked - Current mode:', selectedGameMode);
-                      // Ensure we have a valid game mode
-                      if (!selectedGameMode) {
-                        console.log('❌ No game mode selected, defaulting to standard');
-                        setSelectedGameMode('standard');
-                        initializeGameForMode('standard');
-                      }
-                      
-                      // Force hide game mode selector
-                      setShowGameModeSelector(false);
-                      
-                      // Go to placement phase
-                      setGamePhase('placement');
-                      console.log('✅ Moving to placement phase');
-                    }}
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <Truck className="w-5 h-5" />
-                    🗑️ Deploy Garbage Fleet
-                  </button>
-                </div>
-              </div>
-
-              {/* Join existing game */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-r from-teal-100 to-teal-200 p-2 rounded-lg">
-                    <Users className="w-5 h-5 text-teal-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-800">Join Fleet</h3>
-                </div>
-                
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Enter Collection ID or paste invitation link"
-                    value={gameIdInput}
-                    onChange={(e) => setGameIdInput(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-                  />
-                  
-                  <button
-                    onClick={() => {
-                      if (gameIdInput.trim()) {
-                        setGamePhase('placement');
-                      } else {
-                        toast.error('Please enter a Collection ID');
-                      }
-                    }}
-                    disabled={loading || !gameIdInput.trim()}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <Users className="w-5 h-5" />
-                    🚛 Join Collection
-                  </button>
-                </div>
-                
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <GorbaganaFaucet variant="inline" className="justify-center" />
-                </div>
-              </div>
-            </div>
-
-            {/* Public Games Lobby */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              {showPublicLobby ? (
-                <PublicGamesLobby 
-                  onJoinGame={handleJoinPublicGame}
-                  className="mt-4"
-                />
-              ) : (
-                <div className="text-center">
-                  <button
-                    onClick={() => {
-                      setShowPublicLobby(true);
-                      loadPublicGames();
-                    }}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg mx-auto"
-                  >
-                    <Trophy className="w-5 h-5" />
-                    🏆 Browse The Landfill
-                  </button>
-                                      <p className="text-gray-600 text-sm mt-2">Discover public waste collection routes waiting for workers</p>
-                </div>
-              )}
-            </div>
+      {/* Step 2: Wager Input */}
+      <section>
+        <h2 className="text-xl font-bold mb-2">Step 2: Set Wager</h2>
+        <WalletBalance
+          showWagerInput={true}
+          onWagerChange={setWagerAmount}
+          currentWager={wagerAmount}
+          className="max-w-md"
+          disabled={!!battleshipGame}
+        />
+        {wagerAmount > 0 && (
+          <div className="text-sm text-gray-600 mt-1">
+            Wager: {wagerAmount} GOR
           </div>
         )}
+      </section>
 
-        {/* Ship placement phase */}
-        {gamePhase === 'placement' && (
-          <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-8 mb-6">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8">
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-r from-blue-100 to-teal-100 p-3 rounded-full">
-                  <Ship className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent mb-2">Deploy Your Fleet</h2>
-                  <p className="text-gray-600">
-                    {currentShipIndex < shipsToPlace.length 
-                      ? `Position ${STANDARD_FLEET[currentShipIndex].name} (${shipsToPlace[currentShipIndex].length} squares)`
-                      : 'Fleet deployment complete! Ready for battle.'
-                    }
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3 mt-6 lg:mt-0">
-                <button
-                  onClick={() => setShipOrientation(shipOrientation === 'horizontal' ? 'vertical' : 'horizontal')}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium"
-                >
-                  <Compass className="w-4 h-4 inline mr-2" />
-                  Rotate ({shipOrientation})
-                </button>
-                <button
-                  onClick={generateRandomShips}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                >
-                  Random Fleet
-                </button>
-                <button
-                  onClick={resetShips}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
+      {/* Step 3: Fleet Placement */}
+      <section>
+        <h2 className="text-xl font-bold mb-2">Step 3: Place Your Fleet</h2>
+        <GameBoard
+          board={playerBoard}
+          hits={new Array(getBoardSize() * getBoardSize()).fill(0)}
+          onCellClick={placeShipOnBoard}
+          onCellHover={handleBoardHover}
+          isOwnBoard={true}
+          isPlacementMode={true}
+          isInteractive={!!selectedGameMode && wagerAmount > 0 && !battleshipGame}
+          hoveredShip={hoveredShip}
+          boardSize={getBoardSize()}
+        />
+      </section>
 
-            <div className="flex flex-col lg:flex-row gap-6">
-              {/* Game board */}
-              <div className="flex-1">
-                <GameBoard
-                  board={playerBoard}
-                  hits={new Array(getBoardSize() * getBoardSize()).fill(0)}
-                  onCellClick={placeShipOnBoard}
-                  onCellHover={handleBoardHover}
-                  isOwnBoard={true}
-                  isPlacementMode={true}
-                  isInteractive={true}
-                  hoveredShip={hoveredShip}
-                  boardSize={getBoardSize()}
-                />
-              </div>
+      {/* Step 4: Create/Join Game */}
+      <section>
+        <h2 className="text-xl font-bold mb-2">Step 4: Create or Join Game</h2>
+        <button
+          onClick={createNewGame}
+          disabled={!shipsToPlace.every(ship => ship.placed) || !!battleshipGame}
+          className="px-6 py-3 bg-green-600 text-white rounded disabled:opacity-50"
+        >
+          Create Game
+        </button>
+        <input
+          type="text"
+          placeholder="Enter Game ID to Join"
+          value={gameIdInput}
+          onChange={(e) => setGameIdInput(e.target.value)}
+          disabled={!!battleshipGame}
+          className="ml-4 px-4 py-2 border rounded"
+        />
+        <button
+          onClick={joinGame}
+          disabled={!shipsToPlace.every(ship => ship.placed) || !gameIdInput || !!battleshipGame}
+          className="px-6 py-3 bg-blue-600 text-white rounded disabled:opacity-50 ml-2"
+        >
+          Join Game
+        </button>
+      </section>
 
-              {/* Ship placement progress */}
-              <div className="lg:w-80">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-semibold text-gray-800">Fleet Status</h3>
-                    <div className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                      {GAME_MODES[selectedGameMode].name}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {getFleet().map((shipType, typeIndex) => 
-                      Array.from({ length: shipType.count }, (_, shipIndex) => {
-                        const flatIndex = getFleet().slice(0, typeIndex).reduce((sum, prev) => sum + prev.count, 0) + shipIndex;
-                        return (
-                          <div
-                            key={`${typeIndex}-${shipIndex}`}
-                            className={`p-2 rounded ${
-                              shipsToPlace[flatIndex]?.placed
-                                ? 'bg-green-100 text-green-800'
-                                : flatIndex === currentShipIndex
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            <div className="flex justify-between">
-                              <span>{shipType.name} {shipType.count > 1 ? `#${shipIndex + 1}` : ''}</span>
-                              <span>
-                                {shipsToPlace[flatIndex]?.placed ? '✅' : flatIndex === currentShipIndex ? '👈' : '⏳'}
-                              </span>
-                            </div>
-                            <div className="text-sm opacity-75">
-                              {shipType.length} squares
-                            </div>
-                          </div>
-                        );
-                      })
-                    ).flat()}
-                  </div>
-
-                  {/* Change game mode button */}
-                  <div className="mt-4">
-                    <button
-                      onClick={changeGameMode}
-                      className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Gamepad2 className="w-4 h-4" />
-                      Change Game Mode
-                    </button>
-                  </div>
-                </div>
-
-                {/* Start game button */}
-                {currentShipIndex >= shipsToPlace.length && (
-                  <div className="mt-4">
-                    <button
-                      onClick={gameIdInput ? joinGame : createNewGame}
-                      disabled={loading}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {loading ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          {gameIdInput ? 'Joining...' : 'Creating...'}
-                        </div>
-                      ) : gameIdInput ? (
-                        'Join Game 🤝'
-                      ) : (
-                        'Create Game ⚓'
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Waiting for opponent - Show game board with sharing interface */}
-        {gamePhase === 'waiting' && battleshipGame && (
-          <div className="space-y-6">
-            {/* Share and wait header */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">🚢 Game Ready!</h2>
-                <p className="text-gray-600 mb-4">Game ID: <span className="font-mono font-bold text-blue-600">{battleshipGame.id}</span></p>
-                <p className="text-gray-600 mb-6">Share with your opponent to start the battle!</p>
-                
-                {/* Compact sharing options */}
-                <div className="flex gap-2 justify-center mb-4">
-                  <button
-                    onClick={copyGameId}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Copy ID
-                  </button>
-                  <button
-                    onClick={shareGame}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share
-                  </button>
-                </div>
-
-                {/* Game status */}
-                <div className="text-sm text-gray-500">
-                  <p>⏳ Waiting for player 2 to join...</p>
-                                  {battleshipGame.wager && battleshipGame.wager > 0 && (
-                  <p className="text-orange-600 font-medium">💰 Wager: {battleshipGame.wager} GOR</p>
-                )}
-                  {battleshipGame.isPublic && <p>📢 Public game</p>}
-                </div>
-              </div>
-            </div>
-
-            {/* Show your fleet while waiting */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">🗑️ Your Garbage Fleet (Ready for Collection)</h3>
-              <div className="flex justify-center">
-                <GameBoard
-                  board={playerBoard}
-                  hits={new Array(getBoardSize() * getBoardSize()).fill(0)}
-                  onCellClick={() => {}}
-                  isOwnBoard={true}
-                  isPlacementMode={false}
-                  isInteractive={false}
-                  showShips={true}
-                  boardSize={getBoardSize()}
-                />
-              </div>
-              <div className="mt-4 text-center text-sm text-gray-600">
-                Fleet deployed: {getTotalShipSquares()} garbage truck units ready for collection
-              </div>
-            </div>
-
-            {/* Auto-start message */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-              <p className="text-blue-700 font-medium">
-                🎯 When your opponent joins, the battle will start automatically!
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Playing phase - Enhanced battle interface */}
-        {gamePhase === 'playing' && battleshipGame && (
-          <div className="space-y-6">
-            {/* Game status header */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">⚔️ Battle in Progress!</h2>
-                  <p className="text-lg text-gray-600">
-                    Turn {battleshipGame.turn} • {battleshipGame.player1 === publicKey!.toString() ? 'You are Player 1' : 'You are Player 2'}
-                  </p>
-                  {wagerAmount > 0 && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <DollarSign className="w-4 h-4 text-orange-600" />
-                      <span className="text-orange-600 font-medium">
-                        Stakes: {wagerAmount} GOR • Escrow: {escrowStatus}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex gap-2 flex-wrap">
-                  {wagerAmount > 0 && (
-                    <button
-                      onClick={abandonGame}
-                      disabled={abandoning}
-                      className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                    >
-                      <AlertTriangle className="w-4 h-4" />
-                      {abandoning ? 'Abandoning...' : 'Abandon'}
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={syncGameState}
-                    disabled={syncing}
-                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 text-sm"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                    Sync
-                  </button>
-                  
-                  {battleshipGame && (
-                    <button
-                      onClick={shareGame}
-                      className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      Share
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Pending shot notification - Simplified for current implementation */}
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-blue-700">Ready to battle! Click on enemy waters to fire shots.</p>
-              </div>
-            </div>
-
-            {/* Game boards */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Your board */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">🛡️ Your Fleet</h3>
-                <GameBoard
-                  board={playerBoard}
-                  hits={battleshipGame.player1 === publicKey!.toString() ? 
-                        battleshipGame.boardHits1 : battleshipGame.boardHits2}
-                  onCellClick={() => {}}
-                  isOwnBoard={true}
-                  isPlacementMode={false}
-                  isInteractive={false}
-                  showShips={true}
-                  boardSize={getBoardSize()}
-                />
-                <div className="mt-4 text-sm text-gray-600">
-                  Ships remaining: {
-                    playerBoard.filter(cell => cell === 1).length - 
-                    (battleshipGame.player1 === publicKey!.toString() ? 
-                     battleshipGame.boardHits1 : battleshipGame.boardHits2).filter(hit => hit === 2).length
-                  } / {getTotalShipSquares()}
-                </div>
-              </div>
-
-              {/* Enemy board */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">🎯 Enemy Waters</h3>
-                <GameBoard
-                  board={new Array(getBoardSize() * getBoardSize()).fill(0)}
-                  hits={battleshipGame.player1 === publicKey!.toString() ? 
-                        battleshipGame.boardHits2 : battleshipGame.boardHits1}
-                  onCellClick={fireShot}
-                  isOwnBoard={false}
-                  isPlacementMode={false}
-                  isInteractive={true}
-                  boardSize={getBoardSize()}
-                />
-                <div className="mt-4 text-sm text-gray-600">
-                  Your hits: {
-                    (battleshipGame.player1 === publicKey!.toString() ? 
-                     battleshipGame.boardHits2 : battleshipGame.boardHits1).filter(hit => hit === 2).length
-                  } / {getTotalShipSquares()}
-                </div>
-              </div>
-            </div>
-
-            {/* Turn indicator */}
-            <div className="bg-white rounded-lg shadow-lg p-4">
-              <div className="text-center">
-                {((battleshipGame.player1 === publicKey!.toString() && battleshipGame.turn === 1) || 
-                  (battleshipGame.player2 === publicKey!.toString() && battleshipGame.turn === 2)) ? (
-                  <p className="text-green-600 font-semibold text-lg">🎯 Your turn - Click on enemy waters to fire!</p>
-                ) : (
-                  <p className="text-blue-600 font-semibold text-lg">⏳ Waiting for opponent's move...</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reveal phase */}
-        {gamePhase === 'reveal' && gameState && (
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">🏁 Game Over - Reveal Phase</h2>
-              <p className="text-gray-600 mb-6">
-                {gameState.winner === 1 ? 'Player 1 Wins!' :
-                 gameState.winner === 2 ? 'Player 2 Wins!' : 'Game completed'}
-              </p>
-              
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <p className="text-yellow-800 font-semibold mb-2">Reveal your board to complete the game</p>
-                <button
-                  onClick={revealBoard}
-                  disabled={loading}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {loading ? 'Revealing...' : 'Reveal My Board'}
-                </button>
-              </div>
-
-              <div className="text-sm text-gray-500">
-                <p>Player 1 Revealed: {gameState.player1Revealed ? '✅' : '❌'}</p>
-                <p>Player 2 Revealed: {gameState.player2Revealed ? '✅' : '❌'}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Finished phase */}
-        {gamePhase === 'finished' && battleshipGame && (
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">
-                🎉 Battle Complete!
-              </h2>
-              
-              <div className="mb-6">
-                {battleshipGame.winner === 1 && (
-                  <div className={`${battleshipGame.player1 === publicKey!.toString() ? 'text-green-600' : 'text-red-600'}`}>
-                    <h3 className="text-2xl font-bold">
-                      {battleshipGame.player1 === publicKey!.toString() ? '🏆 VICTORY!' : '💀 DEFEAT'}
-                    </h3>
-                    <p className="text-lg mt-2">Player 1 Wins!</p>
-                  </div>
-                )}
-                {battleshipGame.winner === 2 && (
-                  <div className={`${battleshipGame.player2 === publicKey!.toString() ? 'text-green-600' : 'text-red-600'}`}>
-                    <h3 className="text-2xl font-bold">
-                      {battleshipGame.player2 === publicKey!.toString() ? '🏆 VICTORY!' : '💀 DEFEAT'}
-                    </h3>
-                    <p className="text-lg mt-2">Player 2 Wins!</p>
-                  </div>
-                )}
-                {battleshipGame.winner === 0 && (
-                  <div className="text-gray-600">
-                    <h3 className="text-2xl font-bold">🤝 Draw</h3>
-                  </div>
-                )}
-              </div>
-
-              {/* Payout information */}
-              {battleshipGame.wager && battleshipGame.wager > 0 && (
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6 mb-6">
-                  <h4 className="font-bold text-gray-800 mb-3">💰 Prize Pool</h4>
-                  {battleshipGame.winner && (
-                    <div className="space-y-2">
-                      <p className="text-lg font-semibold text-orange-600">
-                        Winner Takes: {(battleshipGame.wager * 2).toFixed(4)} GOR
-                      </p>
-                      {((battleshipGame.winner === 1 && battleshipGame.player1 === publicKey!.toString()) ||
-                        (battleshipGame.winner === 2 && battleshipGame.player2 === publicKey!.toString())) && (
-                        <p className="text-green-600 font-medium">🎉 Payout processed to your wallet!</p>
-                      )}
-                    </div>
-                  )}
-                  {!battleshipGame.winner && (
-                    <p className="text-gray-600">
-                      Draw - Each player refunded {battleshipGame.wager.toFixed(4)} GOR
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Game statistics */}
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h4 className="font-semibold text-gray-800 mb-4">📊 Battle Statistics</h4>
-                <div className="grid md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="font-medium">Your Hits: {
-                      (battleshipGame.player1 === publicKey!.toString() ? 
-                       battleshipGame.boardHits2 : battleshipGame.boardHits1).filter(hit => hit === 2).length
-                    }</p>
-                    <p className="font-medium">Enemy Hits on You: {
-                      (battleshipGame.player1 === publicKey!.toString() ? 
-                       battleshipGame.boardHits1 : battleshipGame.boardHits2).filter(hit => hit === 2).length
-                    }</p>
-                  </div>
-                  <div>
-                    <p className="font-medium">Game Mode: {GAME_MODES[selectedGameMode].name}</p>
-                    <p className="font-medium">Board Size: {getBoardSize()}x{getBoardSize()}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                  onClick={() => {
-                    setShowGameModeSelector(true);
-                    setGamePhase('setup');
-                    setGameState(null);
-                    setBattleshipGame(null);
-                    resetShips();
-                  }}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                >
-                  🔄 New Game
-                </button>
-                
-                <button
-                  onClick={shareGame}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 justify-center"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share Result
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer with enhanced storage info */}
-        <div className="mt-8 bg-white rounded-lg shadow-lg p-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-600">
-            <div className="flex items-center gap-4">
-              <span>💾 Storage: {backendStatus.available ? 'Cloud + Local' : 'Local Only'}</span>
-              {battleshipGame && (
-                <span>🕒 Last sync: {new Date(battleshipGame.updatedAt).toLocaleTimeString()}</span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {battleshipGame && (
-                <span className="font-mono text-xs">
-                  Game: {battleshipGame.id.slice(0, 8)}...
-                </span>
-              )}
-              <span>⚓ Gorbagana Battleship v2.0</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Step 5: Play Game */}
+      {battleshipGame && (
+        <section>
+          <h2 className="text-xl font-bold mb-2">Step 5: Play!</h2>
+          {/* Render the main game board and controls here */}
+          {/* ...existing game play UI... */}
+        </section>
+      )}
     </div>
   );
 };

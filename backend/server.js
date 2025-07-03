@@ -515,6 +515,19 @@ app.post('/api/games/:gameId/join', async (req, res) => {
     const { gameId } = req.params;
     const { playerAddress, playerBDeposit, playerBTrash } = req.body;
     
+    // Validate required fields
+    console.log(`🔍 Validating required fields...`);
+    if (!playerAddress) {
+      console.log(`❌ Missing playerAddress`);
+      return res.status(400).json({ success: false, error: 'Missing playerAddress' });
+    }
+    if (!playerBDeposit) {
+      console.log(`❌ Missing playerBDeposit`);
+      return res.status(400).json({ success: false, error: 'Missing playerBDeposit' });
+    }
+    console.log(`✅ Required fields validated: playerAddress=${playerAddress}, playerBDeposit=${playerBDeposit}`);
+    console.log(`🗑️ playerBTrash provided:`, playerBTrash ? 'Yes' : 'No', playerBTrash ? `(${playerBTrash.length} items)` : '');
+    
     console.log(`🔍 Looking for game ${gameId} using ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
     
     let game;
@@ -538,7 +551,11 @@ app.post('/api/games/:gameId/join', async (req, res) => {
       });
     }
     
-        if (game.status !== 'waiting') {
+    console.log(`✅ Game ${gameId} found! Status: ${game.status}`);
+    console.log(`🎮 Game details: playerA=${dbConnected ? game.playerA?.publicKey : game.playerA}, playerB=${dbConnected ? game.playerB?.publicKey : game.playerB}`);
+    
+    if (game.status !== 'waiting') {
+      console.log(`❌ Game status is '${game.status}', not 'waiting'`);
       return res.status(400).json({ 
         success: false, 
         error: 'Garbage war is not waiting for players' 
@@ -546,71 +563,113 @@ app.post('/api/games/:gameId/join', async (req, res) => {
     }
 
     if (game.playerB) {
+      console.log(`❌ Game already has playerB: ${dbConnected ? game.playerB.publicKey : game.playerB}`);
       return res.status(400).json({ 
         success: false, 
         error: 'Garbage war is already full' 
       });
     }
+    
+    console.log(`✅ Game is available for joining`);
 
     // Check if player is trying to join their own game (handle both storage types)
     const playerAKey = dbConnected ? game.playerA.publicKey : game.playerA;
+    console.log(`🔍 Self-join check: playerA=${playerAKey}, joining=${playerAddress}`);
     if (playerAKey === playerAddress) {
+      console.log(`❌ Player trying to join own game`);
       return res.status(400).json({ 
         success: false, 
         error: 'Cannot join your own garbage war' 
       });
     }
+    console.log(`✅ Self-join check passed`);
     
     // Update game with second player
     if (dbConnected) {
       console.log(`📝 Updating MongoDB game with playerB data`);
       console.log(`📝 playerBTrash format:`, JSON.stringify(playerBTrash, null, 2));
       
-      // Update MongoDB document
-      game.playerB = {
-        publicKey: playerAddress,
-        board: createEmptyBoard(game.gameMode || 'standard'),
-        trash: playerBTrash || [],
-        deposit: playerBDeposit
-      };
-      game.updatedAt = Date.now();
-      
-      console.log(`📝 Created playerB object:`, JSON.stringify(game.playerB, null, 2));
-      
-      // If both players have trash, start the war
-      if (playerBTrash && validateTrashPlacement(playerBTrash, game.gameMode || 'standard')) {
-        game.status = 'playing';
-        console.log(`✅ Trash validation passed - setting status to 'playing'`);
-      } else {
-        game.status = 'setup'; // Waiting for Player B to place trash
-        console.log(`⏳ No trash provided - setting status to 'setup'`);
+      try {
+        console.log(`🏗️ Creating empty board for game mode: ${game.gameMode || 'standard'}`);
+        const playerBBoard = createEmptyBoard(game.gameMode || 'standard');
+        console.log(`✅ Board created successfully: ${playerBBoard.length}x${playerBBoard[0].length}`);
+        
+        // Update MongoDB document
+        game.playerB = {
+          publicKey: playerAddress,
+          board: playerBBoard,
+          trash: playerBTrash || [],
+          deposit: playerBDeposit
+        };
+        game.updatedAt = Date.now();
+        
+        console.log(`📝 Created playerB object:`, JSON.stringify(game.playerB, null, 2));
+        
+        // If both players have trash, start the war
+        if (playerBTrash && playerBTrash.length > 0) {
+          console.log(`🔍 Validating trash placement for game mode: ${game.gameMode || 'standard'}`);
+          const isValidTrash = validateTrashPlacement(playerBTrash, game.gameMode || 'standard');
+          console.log(`🗑️ Trash validation result: ${isValidTrash ? 'VALID' : 'INVALID'}`);
+          
+          if (isValidTrash) {
+            game.status = 'playing';
+            console.log(`✅ Trash validation passed - setting status to 'playing'`);
+          } else {
+            game.status = 'setup';
+            console.log(`⏳ Trash validation failed - setting status to 'setup'`);
+          }
+        } else {
+          game.status = 'setup'; // Waiting for Player B to place trash
+          console.log(`⏳ No trash provided - setting status to 'setup'`);
+        }
+        
+        console.log(`💾 Saving game to MongoDB...`);
+        await game.save();
+        console.log(`✅ Game saved successfully to MongoDB`);
+        
+      } catch (boardError) {
+        console.error(`❌ Error creating board or validating trash:`, boardError);
+        throw boardError; // Re-throw to be caught by outer catch
       }
-      
-      console.log(`💾 Saving game to MongoDB...`);
-      await game.save();
-      console.log(`✅ Game saved successfully to MongoDB`);
     } else {
       // Update in-memory storage
+      console.log(`💾 Updating in-memory storage with playerB data`);
       game.playerB = playerAddress;
       game.playerBDeposit = playerBDeposit;
       game.playerBTrash = playerBTrash || []; // Trash will be placed separately
       game.updatedAt = Date.now();
       
+      console.log(`✅ In-memory storage updated: playerB=${playerAddress}`);
+      
       // If both players have trash, start the war
-      if (playerBTrash && validateTrashPlacement(playerBTrash, game.gameMode || 'standard')) {
-        game.status = 'playing';
+      if (playerBTrash && playerBTrash.length > 0) {
+        console.log(`🔍 Validating trash placement for in-memory game mode: ${game.gameMode || 'standard'}`);
+        const isValidTrash = validateTrashPlacement(playerBTrash, game.gameMode || 'standard');
+        console.log(`🗑️ In-memory trash validation result: ${isValidTrash ? 'VALID' : 'INVALID'}`);
+        
+        if (isValidTrash) {
+          game.status = 'playing';
+          console.log(`✅ In-memory: setting status to 'playing'`);
+        } else {
+          game.status = 'setup';
+          console.log(`⏳ In-memory: setting status to 'setup'`);
+        }
       } else {
         game.status = 'setup'; // Waiting for Player B to place trash
+        console.log(`⏳ In-memory: No trash provided - setting status to 'setup'`);
       }
       
       // Track games by player
+      console.log(`📝 Tracking game ${gameId} for player ${playerAddress}`);
       if (!gamesByPlayer.has(playerAddress)) {
         gamesByPlayer.set(playerAddress, new Set());
       }
       gamesByPlayer.get(playerAddress).add(gameId);
+      console.log(`✅ Player tracking updated`);
     }
     
     console.log(`👥 Player ${playerAddress} joined garbage war ${gameId}`);
+    console.log(`🎉 JOIN SUCCESSFUL - Sending response with game status: ${game.status}`);
     
     res.json({ 
       success: true, 

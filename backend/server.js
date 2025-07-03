@@ -1,3 +1,10 @@
+process.on('uncaughtException', (err) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ UNHANDLED REJECTION:', reason);
+});
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -87,7 +94,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Note: Cleanup is now handled in setupDatabaseCleanup() function
+// Request logger middleware
+app.use((req, res, next) => {
+  console.log(`➡️  ${req.method} ${req.originalUrl} - Body:`, JSON.stringify(req.body));
+  next();
+});
 
 // Game Mode Configuration
 const GAME_MODES = {
@@ -507,187 +518,18 @@ app.put('/api/games/:gameId', async (req, res) => {
   }
 });
 
-// Join a garbage war
+// Wrap join endpoint in try/catch
+const originalJoinHandler = app._router.stack.find(r => r.route && r.route.path === '/api/games/:gameId/join').route.stack[0].handle;
+app._router.stack = app._router.stack.filter(r => !(r.route && r.route.path === '/api/games/:gameId/join'));
 app.post('/api/games/:gameId/join', async (req, res) => {
   try {
-    console.log(`🎯 JOIN REQUEST: gameId=${req.params.gameId}, body=`, JSON.stringify(req.body, null, 2));
-    
-    const { gameId } = req.params;
-    const { playerAddress, playerBDeposit, playerBTrash } = req.body;
-    
-    // Validate required fields
-    console.log(`🔍 Validating required fields...`);
-    if (!playerAddress) {
-      console.log(`❌ Missing playerAddress`);
-      return res.status(400).json({ success: false, error: 'Missing playerAddress' });
-    }
-    if (!playerBDeposit) {
-      console.log(`❌ Missing playerBDeposit`);
-      return res.status(400).json({ success: false, error: 'Missing playerBDeposit' });
-    }
-    console.log(`✅ Required fields validated: playerAddress=${playerAddress}, playerBDeposit=${playerBDeposit}`);
-    console.log(`🗑️ playerBTrash provided:`, playerBTrash ? 'Yes' : 'No', playerBTrash ? `(${playerBTrash.length} items)` : '');
-    
-    console.log(`🔍 Looking for game ${gameId} using ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
-    
-    let game;
-    
-    if (dbConnected) {
-      // Use MongoDB
-      console.log(`📊 MongoDB query: Game.findOne({ id: "${gameId}" })`);
-      game = await Game.findOne({ id: gameId });
-      console.log(`📊 MongoDB result:`, game ? `Found game with status=${game.status}` : 'No game found');
-    } else {
-      // Use in-memory storage
-      game = games.get(gameId);
-      console.log(`💾 In-memory result:`, game ? `Found game with status=${game.status}` : 'No game found');
-    }
-    
-    if (!game) {
-      console.log(`❌ Game ${gameId} not found in ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Garbage war not found' 
-      });
-    }
-    
-    console.log(`✅ Game ${gameId} found! Status: ${game.status}`);
-    console.log(`🎮 Game details: playerA=${dbConnected ? game.playerA?.publicKey : game.playerA}, playerB=${dbConnected ? game.playerB?.publicKey : game.playerB}`);
-    
-    if (game.status !== 'waiting') {
-      console.log(`❌ Game status is '${game.status}', not 'waiting'`);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Garbage war is not waiting for players' 
-      });
-    }
-
-    if (game.playerB) {
-      console.log(`❌ Game already has playerB: ${dbConnected ? game.playerB.publicKey : game.playerB}`);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Garbage war is already full' 
-      });
-    }
-    
-    console.log(`✅ Game is available for joining`);
-
-    // Check if player is trying to join their own game (handle both storage types)
-    const playerAKey = dbConnected ? game.playerA.publicKey : game.playerA;
-    console.log(`🔍 Self-join check: playerA=${playerAKey}, joining=${playerAddress}`);
-    if (playerAKey === playerAddress) {
-      console.log(`❌ Player trying to join own game`);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Cannot join your own garbage war' 
-      });
-    }
-    console.log(`✅ Self-join check passed`);
-    
-    // Update game with second player
-    if (dbConnected) {
-      console.log(`📝 Updating MongoDB game with playerB data`);
-      console.log(`📝 playerBTrash format:`, JSON.stringify(playerBTrash, null, 2));
-      
-      try {
-        console.log(`🏗️ Creating empty board for game mode: ${game.gameMode || 'standard'}`);
-        const playerBBoard = createEmptyBoard(game.gameMode || 'standard');
-        console.log(`✅ Board created successfully: ${playerBBoard.length}x${playerBBoard[0].length}`);
-        
-        // Update MongoDB document
-        game.playerB = {
-          publicKey: playerAddress,
-          board: playerBBoard,
-          trash: playerBTrash || [],
-          deposit: playerBDeposit
-        };
-        game.updatedAt = Date.now();
-        
-        console.log(`📝 Created playerB object:`, JSON.stringify(game.playerB, null, 2));
-        
-        // If both players have trash, start the war
-        if (playerBTrash && playerBTrash.length > 0) {
-          console.log(`🔍 Validating trash placement for game mode: ${game.gameMode || 'standard'}`);
-          const isValidTrash = validateTrashPlacement(playerBTrash, game.gameMode || 'standard');
-          console.log(`🗑️ Trash validation result: ${isValidTrash ? 'VALID' : 'INVALID'}`);
-          
-          if (isValidTrash) {
-            game.status = 'playing';
-            console.log(`✅ Trash validation passed - setting status to 'playing'`);
-          } else {
-            game.status = 'setup';
-            console.log(`⏳ Trash validation failed - setting status to 'setup'`);
-          }
-        } else {
-          game.status = 'setup'; // Waiting for Player B to place trash
-          console.log(`⏳ No trash provided - setting status to 'setup'`);
-        }
-        
-        console.log(`💾 Saving game to MongoDB...`);
-        await game.save();
-        console.log(`✅ Game saved successfully to MongoDB`);
-        
-      } catch (boardError) {
-        console.error(`❌ Error creating board or validating trash:`, boardError);
-        throw boardError; // Re-throw to be caught by outer catch
-      }
-    } else {
-      // Update in-memory storage
-      console.log(`💾 Updating in-memory storage with playerB data`);
-      game.playerB = playerAddress;
-      game.playerBDeposit = playerBDeposit;
-      game.playerBTrash = playerBTrash || []; // Trash will be placed separately
-      game.updatedAt = Date.now();
-      
-      console.log(`✅ In-memory storage updated: playerB=${playerAddress}`);
-      
-      // If both players have trash, start the war
-      if (playerBTrash && playerBTrash.length > 0) {
-        console.log(`🔍 Validating trash placement for in-memory game mode: ${game.gameMode || 'standard'}`);
-        const isValidTrash = validateTrashPlacement(playerBTrash, game.gameMode || 'standard');
-        console.log(`🗑️ In-memory trash validation result: ${isValidTrash ? 'VALID' : 'INVALID'}`);
-        
-        if (isValidTrash) {
-          game.status = 'playing';
-          console.log(`✅ In-memory: setting status to 'playing'`);
-        } else {
-          game.status = 'setup';
-          console.log(`⏳ In-memory: setting status to 'setup'`);
-        }
-      } else {
-        game.status = 'setup'; // Waiting for Player B to place trash
-        console.log(`⏳ In-memory: No trash provided - setting status to 'setup'`);
-      }
-      
-      // Track games by player
-      console.log(`📝 Tracking game ${gameId} for player ${playerAddress}`);
-      if (!gamesByPlayer.has(playerAddress)) {
-        gamesByPlayer.set(playerAddress, new Set());
-      }
-      gamesByPlayer.get(playerAddress).add(gameId);
-      console.log(`✅ Player tracking updated`);
-    }
-    
-    console.log(`👥 Player ${playerAddress} joined garbage war ${gameId}`);
-    console.log(`🎉 JOIN SUCCESSFUL - Sending response with game status: ${game.status}`);
-    
-    res.json({ 
-      success: true, 
-      game,
-      message: 'Successfully joined garbage war'
-    });
-    
-  } catch (error) {
-    console.error('❌ Error joining garbage war:', error);
-    console.error('❌ Error stack:', error.stack);
-    console.error('❌ Error details:', {
-      message: error.message,
-      name: error.name,
-      code: error.code
-    });
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to join garbage war: ' + error.message 
+    await originalJoinHandler(req, res);
+  } catch (err) {
+    console.error('❌ JOIN ENDPOINT ERROR:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      details: err && (err.stack || err.message || err)
     });
   }
 });
@@ -975,87 +817,18 @@ app.post('/api/games/:gameId/abandon', async (req, res) => {
   }
 });
 
-// Forfeit garbage war (opponent wins)
+// Wrap forfeit endpoint in try/catch
+const originalForfeitHandler = app._router.stack.find(r => r.route && r.route.path === '/api/games/:gameId/forfeit').route.stack[0].handle;
+app._router.stack = app._router.stack.filter(r => !(r.route && r.route.path === '/api/games/:gameId/forfeit'));
 app.post('/api/games/:gameId/forfeit', async (req, res) => {
   try {
-    console.log(`🏳️ FORFEIT REQUEST: gameId=${req.params.gameId}, body=`, JSON.stringify(req.body, null, 2));
-    
-    const { gameId } = req.params;
-    const { playerAddress, winner, reason } = req.body;
-    
-    console.log(`🔍 Looking for game ${gameId} using ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
-    console.log(`🎯 Request params: playerAddress=${playerAddress}, winner=${winner}, reason=${reason}`);
-    
-    let game;
-    
-    if (dbConnected) {
-      // Use MongoDB
-      console.log(`📊 MongoDB query: Game.findOne({ id: "${gameId}" })`);
-      game = await Game.findOne({ id: gameId });
-      console.log(`📊 MongoDB result:`, game ? `Found game with status=${game.status}` : 'No game found');
-    } else {
-      // Use in-memory storage
-      game = games.get(gameId);
-      console.log(`💾 In-memory result:`, game ? `Found game with status=${game.status}` : 'No game found');
-    }
-    
-    if (!game) {
-      console.log(`❌ Game ${gameId} not found in ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Garbage war not found' 
-      });
-    }
-    
-    console.log(`✅ Game ${gameId} found, checking player validation...`);
-    
-    // Check if player is in this game (handle both storage types)
-    const playerAKey = dbConnected ? game.playerA?.publicKey : game.playerA;
-    const playerBKey = dbConnected ? game.playerB?.publicKey : game.playerB;
-    
-    console.log(`🔍 Player validation: playerA=${playerAKey}, playerB=${playerBKey}, requesting=${playerAddress}`);
-    
-    if (playerAKey !== playerAddress && playerBKey !== playerAddress) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'You are not a player in this garbage war' 
-      });
-    }
-    
-    // Set opponent as winner
-    console.log(`🏁 Setting game as finished - winner: ${winner}`);
-    game.status = 'finished';
-    game.winner = winner;
-    game.abandonReason = reason || 'Player forfeited';
-    game.updatedAt = Date.now();
-    
-    if (dbConnected) {
-      console.log(`💾 Saving forfeit to MongoDB...`);
-      await game.save();
-      console.log(`✅ Forfeit saved successfully to MongoDB`);
-    } else {
-      console.log(`💾 Forfeit saved to in-memory storage`);
-    }
-    
-    console.log(`🏳️ Garbage war ${gameId} forfeited by ${playerAddress} - Winner: ${winner}`);
-    
-    res.json({ 
-      success: true, 
-      game,
-      message: 'Garbage war forfeited'
-    });
-    
-  } catch (error) {
-    console.error('❌ Error forfeiting garbage war:', error);
-    console.error('❌ Error stack:', error.stack);
-    console.error('❌ Error details:', {
-      message: error.message,
-      name: error.name,
-      code: error.code
-    });
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to forfeit garbage war: ' + error.message 
+    await originalForfeitHandler(req, res);
+  } catch (err) {
+    console.error('❌ FORFEIT ENDPOINT ERROR:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      details: err && (err.stack || err.message || err)
     });
   }
 });
@@ -1131,20 +904,13 @@ app.delete('/api/games/:gameId', (req, res) => {
   }
 });
 
-// Error handling middleware
+// GLOBAL ERROR HANDLER (must be last middleware)
 app.use((err, req, res, next) => {
-  console.error('❌ Server error:', err);
-  res.status(500).json({ 
-    success: false, 
-    error: 'Internal server error' 
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    error: 'Endpoint not found' 
+  console.error('❌ GLOBAL ERROR HANDLER:', err);
+  res.status(500).json({
+    success: false,
+    error: 'Internal Server Error',
+    details: err && (err.stack || err.message || err)
   });
 });
 

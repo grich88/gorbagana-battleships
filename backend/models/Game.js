@@ -1,373 +1,164 @@
 const mongoose = require('mongoose');
 
-// Game Mode Schema
-const gameModeSchema = new mongoose.Schema({
-  mode: {
-    type: String,
-    enum: ['quick', 'standard', 'extended'],
-    default: 'standard'
-  },
-  boardSize: {
-    type: Number,
-    required: true,
-    min: 6,
-    max: 12
-  },
-  totalShipSquares: {
-    type: Number,
-    required: true
-  }
-});
-
-// Player Schema
-const playerSchema = new mongoose.Schema({
-  id: {
+// Player Schema for embedded player data
+const PlayerSchema = new mongoose.Schema({
+  publicKey: {
     type: String,
     required: true
   },
-  name: {
-    type: String,
-    default: 'Anonymous Captain'
+  board: {
+    type: [[String]], // 2D array of cell states
+    required: true
   },
-  walletAddress: String,
-  joined: {
-    type: Boolean,
-    default: false
+  trash: {
+    type: [[[Number]]], // Array of trash items, each containing coordinates
+    required: true
   },
-  ready: {
-    type: Boolean,
-    default: false
-  },
-  boardCommitment: String,
-  ships: [{
-    length: Number,
-    positions: [Number],
-    orientation: String,
-    sunk: {
-      type: Boolean,
-      default: false
-    }
-  }],
-  hits: {
-    type: [Number],
-    default: []
-  },
-  misses: {
-    type: [Number], 
-    default: []
-  }
-});
-
-// Game State Schema
-const gameStateSchema = new mongoose.Schema({
-  phase: {
-    type: String,
-    enum: ['setup', 'placement', 'waiting', 'playing', 'reveal', 'finished'],
-    default: 'setup'
-  },
-  turn: {
-    type: Number,
-    default: 1
-  },
-  currentPlayer: {
-    type: String,
-    enum: ['player1', 'player2'],
-    default: 'player1'
-  },
-  winner: {
-    type: String,
-    enum: ['player1', 'player2', 'draw', null],
+  deposit: {
+    type: String, // Transaction signature
     default: null
-  },
-  pendingShot: {
-    coordinates: [Number],
-    by: String,
-    timestamp: Date
   }
-});
+}, { _id: false });
 
-// Main Game Schema
-const gameSchema = new mongoose.Schema({
-  // Game Identification
+// Game Schema
+const GameSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
     unique: true,
     index: true
   },
-  
-  // Game Configuration
-  gameMode: {
-    type: gameModeSchema,
+  playerA: PlayerSchema,
+  playerB: {
+    type: PlayerSchema,
+    default: null
+  },
+  currentTurn: {
+    type: String,
     required: true
   },
-  
-  // Players
-  player1: playerSchema,
-  player2: playerSchema,
-  
-  // Game State
-  gameState: {
-    type: gameStateSchema,
-    required: true
+  status: {
+    type: String,
+    enum: ['waiting', 'playing', 'finished'],
+    default: 'waiting',
+    index: true
   },
-  
-  // Game Settings
+  winner: {
+    type: String,
+    default: null
+  },
+  wager: {
+    type: Number,
+    required: true,
+    min: 0
+  },
   isPublic: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  gameMode: {
+    type: String,
+    enum: ['quick', 'standard', 'extended'],
+    default: 'standard',
+    index: true
+  },
+  escrowAccount: {
+    type: String,
+    required: true
+  },
+  txSignature: {
+    type: String,
+    required: true
+  },
+  abandonReason: {
+    type: String,
+    default: null
+  },
+  payoutProcessed: {
     type: Boolean,
     default: false
   },
-  
-  maxPlayers: {
-    type: Number,
-    default: 2,
-    min: 2,
-    max: 2
-  },
-  
-  // Metadata
-  creator: {
-    id: String,
-    name: String,
-    walletAddress: String
-  },
-  
-  // Timestamps
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  },
-  
-  startedAt: Date,
-  finishedAt: Date,
-  
-  // Game Statistics
-  totalMoves: {
-    type: Number,
-    default: 0
-  },
-  
-  duration: Number, // in milliseconds
-  
-  // Blockchain Integration
-  onChainData: {
-    gameAccount: String,
-    programId: String,
-    transactions: [{
-      type: String,
-      signature: String,
-      timestamp: Date,
-      player: String
-    }]
-  },
-  
-  // Wager and Escrow System
-  wagerAmount: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-  
-  escrowStatus: {
+  payoutTxSignature: {
     type: String,
-    enum: ['none', 'pending', 'locked', 'released', 'refunded'],
-    default: 'none'
-  },
-  
-  escrowData: {
-    creatorDeposit: {
-      type: Number,
-      default: 0
-    },
-    opponentDeposit: {
-      type: Number,
-      default: 0
-    },
-    escrowAccount: String,
-    transactionIds: [String],
-    releaseTransaction: String,
-    refundTransactions: [String]
-  },
-  
-  // Game Timeout and Abandonment
-  timeoutAt: {
-    type: Date,
     default: null
-  },
-  
-  abandonedBy: String,
-  abandonReason: {
-    type: String,
-    enum: ['player_left', 'timeout', 'inactivity', 'mutual', 'system'],
-    default: null
-  },
-  
-  // Player Status
-  playersDeposited: {
-    player1: {
-      type: Boolean,
-      default: false
-    },
-    player2: {
-      type: Boolean,
-      default: false
-    }
-  },
-  
-  // Additional Features
-  spectators: [{
-    id: String,
-    name: String,
-    joinedAt: Date
-  }],
-  
-  chatMessages: [{
-    player: String,
-    message: String,
-    timestamp: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  
-  // Game History for analysis
-  moveHistory: [{
-    player: String,
-    action: String,
-    coordinates: [Number],
-    result: String,
-    timestamp: {
-      type: Date,
-      default: Date.now
-    }
-  }]
-}, {
-  timestamps: true,
-  versionKey: false
-});
-
-// Indexes for performance
-gameSchema.index({ id: 1 });
-gameSchema.index({ isPublic: 1, 'gameState.phase': 1 });
-gameSchema.index({ 'creator.id': 1 });
-gameSchema.index({ createdAt: -1 });
-gameSchema.index({ 'gameState.phase': 1, updatedAt: -1 });
-
-// Virtual for game status
-gameSchema.virtual('status').get(function() {
-  const phase = this.gameState.phase;
-  const player1 = this.player1;
-  const player2 = this.player2;
-  
-  if (phase === 'finished') {
-    return `Game finished - ${this.gameState.winner ? `${this.gameState.winner} wins` : 'Draw'}`;
-  } else if (phase === 'playing') {
-    return `Battle in progress - ${this.gameState.currentPlayer}'s turn`;
-  } else if (phase === 'waiting') {
-    return 'Waiting for opponent';
-  } else if (phase === 'placement') {
-    return 'Players placing ships';
-  } else {
-    return 'Setting up game';
   }
+}, {
+  timestamps: true, // Automatically adds createdAt and updatedAt
+  collection: 'games'
 });
 
-// Virtual for player count
-gameSchema.virtual('playerCount').get(function() {
-  let count = 0;
-  if (this.player1 && this.player1.joined) count++;
-  if (this.player2 && this.player2.joined) count++;
-  return count;
-});
+// Indexes for better query performance
+GameSchema.index({ status: 1, isPublic: 1 }); // For public game listings
+GameSchema.index({ 'playerA.publicKey': 1 }); // For player game lookups
+GameSchema.index({ 'playerB.publicKey': 1 }); // For player game lookups
+GameSchema.index({ createdAt: -1 }); // For recent games
 
 // Instance methods
-gameSchema.methods.addPlayer = function(playerData) {
-  if (!this.player1 || !this.player1.joined) {
-    this.player1 = { ...playerData, joined: true };
-    return 'player1';
-  } else if (!this.player2 || !this.player2.joined) {
-    this.player2 = { ...playerData, joined: true };
-    return 'player2';
-  } else {
-    throw new Error('Game is full');
-  }
+GameSchema.methods.isPlayerInGame = function(publicKey) {
+  return this.playerA.publicKey === publicKey || 
+         (this.playerB && this.playerB.publicKey === publicKey);
 };
 
-gameSchema.methods.removePlayer = function(playerId) {
-  if (this.player1 && this.player1.id === playerId) {
-    this.player1 = {};
-  } else if (this.player2 && this.player2.id === playerId) {
-    this.player2 = {};
+GameSchema.methods.getOpponentKey = function(publicKey) {
+  if (this.playerA.publicKey === publicKey) {
+    return this.playerB ? this.playerB.publicKey : null;
   }
-};
-
-gameSchema.methods.getPlayer = function(playerId) {
-  if (this.player1 && this.player1.id === playerId) {
-    return { player: this.player1, role: 'player1' };
-  } else if (this.player2 && this.player2.id === playerId) {
-    return { player: this.player2, role: 'player2' };
+  if (this.playerB && this.playerB.publicKey === publicKey) {
+    return this.playerA.publicKey;
   }
   return null;
 };
 
-gameSchema.methods.isPlayerTurn = function(playerId) {
-  const playerData = this.getPlayer(playerId);
-  if (!playerData) return false;
-  
-  return this.gameState.currentPlayer === playerData.role;
+GameSchema.methods.getPlayerData = function(publicKey) {
+  if (this.playerA.publicKey === publicKey) {
+    return this.playerA;
+  }
+  if (this.playerB && this.playerB.publicKey === publicKey) {
+    return this.playerB;
+  }
+  return null;
 };
 
-gameSchema.methods.addMove = function(player, action, coordinates, result) {
-  this.moveHistory.push({
-    player,
-    action,
-    coordinates,
-    result,
-    timestamp: new Date()
-  });
-  this.totalMoves++;
+GameSchema.methods.getOpponentData = function(publicKey) {
+  if (this.playerA.publicKey === publicKey) {
+    return this.playerB;
+  }
+  if (this.playerB && this.playerB.publicKey === publicKey) {
+    return this.playerA;
+  }
+  return null;
 };
 
-// Static methods
-gameSchema.statics.findPublicGames = function() {
-  return this.find({
-    isPublic: true,
-    'gameState.phase': { $in: ['waiting', 'playing'] }
-  }).sort({ createdAt: -1 }).limit(20);
+// Static methods for common queries
+GameSchema.statics.findPublicGames = function() {
+  return this.find({ 
+    status: 'waiting', 
+    isPublic: true 
+  }).sort({ createdAt: -1 });
 };
 
-gameSchema.statics.findGameById = function(gameId) {
-  return this.findOne({ id: gameId });
-};
-
-gameSchema.statics.findGamesByPlayer = function(playerId) {
+GameSchema.statics.findPlayerGames = function(publicKey) {
   return this.find({
     $or: [
-      { 'player1.id': playerId },
-      { 'player2.id': playerId }
+      { 'playerA.publicKey': publicKey },
+      { 'playerB.publicKey': publicKey }
     ]
   }).sort({ updatedAt: -1 });
 };
 
+GameSchema.statics.findActiveGames = function() {
+  return this.find({ status: 'playing' });
+};
+
 // Pre-save middleware
-gameSchema.pre('save', function(next) {
+GameSchema.pre('save', function(next) {
+  // Update the updatedAt field manually if needed
   this.updatedAt = new Date();
-  
-  // Set game duration if finished
-  if (this.gameState.phase === 'finished' && this.startedAt && !this.finishedAt) {
-    this.finishedAt = new Date();
-    this.duration = this.finishedAt - this.startedAt;
-  }
-  
   next();
 });
 
-// Create and export the model
-const Game = mongoose.model('Game', gameSchema);
+// Export the model
+const Game = mongoose.model('Game', GameSchema);
 
 module.exports = Game; 

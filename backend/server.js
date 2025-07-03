@@ -1,806 +1,939 @@
-// Gorbagana Battleship Backend API Server
-// Enhanced with MongoDB integration for persistent game storage
-
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const compression = require('compression');
-require('dotenv').config();
-
-// MongoDB imports
-const dbConnection = require('./config/database');
+const { v4: uuidv4 } = require('uuid');
+const connectDB = require('./config/database');
 const Game = require('./models/Game');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// MongoDB connection
-let mongoConnected = false;
+console.log('🚀 GORBAGANA TRASH COMBAT BACKEND v2.0 STARTING...');
+console.log('🔥 REBUILD USING PROVEN PATTERNS FROM WORKING TRASH TAC TOE');
+console.log(`🔥 DEPLOYMENT TIMESTAMP: ${new Date().toISOString()}`);
+console.log('🌐 CORS enabled for origins:', process.env.NODE_ENV === 'production' 
+  ? 'https://your-trash-combat-app.netlify.app' 
+  : 'http://localhost:3000, https://your-trash-combat-app.netlify.app'
+);
+
+// Database connection status
+let dbConnected = false;
 
 // Initialize database connection
-const initializeDatabase = async () => {
+const initializeServer = async () => {
   try {
-    if (process.env.MONGODB_URI) {
-      await dbConnection.connect(process.env.MONGODB_URI);
-      mongoConnected = true;
-      console.log('🎉 MongoDB connection established successfully!');
-      
-      // Count existing games
-      const gameCount = await Game.countDocuments();
-      console.log(`📊 Found ${gameCount} existing games in database`);
+    const connection = await connectDB();
+    dbConnected = !!connection;
+    
+    if (dbConnected) {
+      console.log('✅ MongoDB integration enabled');
+      // Set up periodic cleanup for old games
+      setupDatabaseCleanup();
     } else {
-      console.warn('⚠️ No MONGODB_URI found in environment variables');
-      console.log('💾 Falling back to in-memory storage');
+      console.log('⚠️ Running with in-memory storage (development mode)');
+      // Fallback to in-memory storage for development
+      setupInMemoryStorage();
     }
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error.message);
-    console.log('💾 Falling back to in-memory storage');
-    mongoConnected = false;
+    console.error('❌ Database initialization failed:', error.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.log('⚠️ Continuing with in-memory storage');
+      setupInMemoryStorage();
+    }
   }
 };
 
-// Fallback in-memory storage for when MongoDB is not available
-const inMemoryGames = new Map();
-const gameHistory = [];
+// In-memory fallback storage for development
+let games, publicGames, gamesByPlayer;
+
+const setupInMemoryStorage = () => {
+  games = new Map();
+  publicGames = new Set();
+  gamesByPlayer = new Map();
+  console.log('📝 In-memory storage initialized');
+};
+
+const setupDatabaseCleanup = () => {
+  // Clean up old games every hour
+  setInterval(async () => {
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const result = await Game.deleteMany({
+        createdAt: { $lt: oneDayAgo },
+        status: { $in: ['waiting', 'finished'] }
+      });
+      
+      if (result.deletedCount > 0) {
+        console.log(`🧹 Database cleanup: removed ${result.deletedCount} old games`);
+      }
+    } catch (error) {
+      console.error('❌ Database cleanup error:', error.message);
+    }
+  }, 60 * 60 * 1000);
+};
 
 // Middleware
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: false,
-}));
-
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3003',
-    'http://localhost:3004',
-    'http://localhost:3005',
-    'https://gorbagana-battleship.vercel.app',
-    'https://gorbagana-battleship.netlify.app',
-    'https://gorbagana-battleship-frontend.onrender.com'
+    'https://your-trash-combat-app.netlify.app'
   ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true
 }));
+app.use(express.json());
 
-app.use(compression());
-app.use(morgan('combined'));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Note: Cleanup is now handled in setupDatabaseCleanup() function
 
-// Utility functions
-const sanitizeGame = (game) => {
-  // Convert Uint8Array fields to regular arrays for JSON serialization
-  const sanitized = { ...game };
-  
-  if (sanitized.player1Salt && typeof sanitized.player1Salt === 'object') {
-    sanitized.player1Salt = Array.from(sanitized.player1Salt);
+// Game Mode Configuration
+const GAME_MODES = {
+  quick: {
+    boardSize: 6,
+    fleet: [
+      { length: 3, count: 1, name: 'Garbage Truck' },
+      { length: 2, count: 2, name: 'Pickup Van' },
+    ],
+    totalShipSquares: 7, // 3 + 2 + 2 = 7
+    name: 'Quick Collection',
+    description: '6x6 grid with 3 small waste haulers',
+    estimatedTime: '3-5 minutes'
+  },
+  standard: {
+    boardSize: 10,
+    fleet: [
+      { length: 5, count: 1, name: 'Super Hauler' },
+      { length: 4, count: 1, name: 'Dumpster Truck' },
+      { length: 3, count: 2, name: 'Garbage Truck' },
+      { length: 2, count: 1, name: 'Pickup Van' }
+    ],
+    totalShipSquares: 17, // 5 + 4 + 3 + 3 + 2 = 17
+    name: 'Standard Collection',
+    description: '10x10 grid with classic waste fleet',
+    estimatedTime: '10-15 minutes'
+  },
+  extended: {
+    boardSize: 12,
+    fleet: [
+      { length: 6, count: 1, name: 'Mega Compactor' },
+      { length: 5, count: 1, name: 'Super Hauler' },
+      { length: 4, count: 2, name: 'Dumpster Truck' },
+      { length: 3, count: 2, name: 'Garbage Truck' },
+      { length: 2, count: 2, name: 'Pickup Van' }
+    ],
+    totalShipSquares: 28, // 6 + 5 + 4 + 4 + 3 + 3 + 2 + 2 = 28
+    name: 'Extended Collection',
+    description: '12x12 grid with massive waste fleet',
+    estimatedTime: '20-30 minutes'
   }
-  if (sanitized.player2Salt && typeof sanitized.player2Salt === 'object') {
-    sanitized.player2Salt = Array.from(sanitized.player2Salt);
-  }
-  
-  return sanitized;
 };
 
-const deserializeGame = (game) => {
-  // Convert arrays back to Uint8Array for consistency
-  const deserialized = { ...game };
-  
-  if (deserialized.player1Salt && Array.isArray(deserialized.player1Salt)) {
-    deserialized.player1Salt = new Uint8Array(deserialized.player1Salt);
-  }
-  if (deserialized.player2Salt && Array.isArray(deserialized.player2Salt)) {
-    deserialized.player2Salt = new Uint8Array(deserialized.player2Salt);
-  }
-  
-  return deserialized;
+// Helper functions
+const createEmptyBoard = (gameMode = 'standard') => {
+  const boardSize = GAME_MODES[gameMode].boardSize;
+  return Array(boardSize).fill(null).map(() => Array(boardSize).fill("empty"));
 };
 
-const cleanupOldGames = async () => {
-  const now = new Date();
-  const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes
-  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour
-  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours
-  let cleaned = 0;
+const checkGameEnd = (board, trashItems) => {
+  // Check if all trash cells are hit
+  let totalTrashCells = 0;
+  let hitCells = 0;
   
-  try {
-    if (mongoConnected) {
-      // Find games to clean up with escrow handling
-      const expiredGames = await Game.find({
-        $or: [
-          // Idle games older than 30 minutes
-          { 
-            updatedAt: { $lt: thirtyMinutesAgo }, 
-            'gameState.phase': { $in: ['waiting', 'setup'] } 
-          },
-          // Abandoned games older than 1 hour
-          { 
-            abandonReason: { $exists: true }, 
-            updatedAt: { $lt: oneHourAgo } 
-          },
-          // Finished games older than 24 hours
-          { 
-            'gameState.phase': 'finished', 
-            finishedAt: { $lt: oneDayAgo } 
-          }
-        ]
-      });
-
-      // Handle escrow refunds before deletion
-      for (const game of expiredGames) {
-        if (game.wagerAmount > 0 && game.escrowStatus === 'locked') {
-          await handleEscrowRefund(game);
-        }
+  trashItems.forEach(trash => {
+    trash.forEach(([row, col]) => {
+      totalTrashCells++;
+      if (board[row][col] === "hit") {
+        hitCells++;
       }
+    });
+  });
+  
+  return totalTrashCells > 0 && hitCells === totalTrashCells;
+};
 
-      // Delete the games
-      const result = await Game.deleteMany({
-        _id: { $in: expiredGames.map(g => g._id) }
-      });
-      cleaned = result.deletedCount;
-    } else {
-      // In-memory cleanup
-      for (const [gameId, game] of inMemoryGames.entries()) {
-        const gameTime = new Date(game.updatedAt || game.createdAt);
-        const shouldCleanup = 
-          (gameTime < thirtyMinutesAgo && ['waiting', 'setup'].includes(game.status)) ||
-          (game.abandonReason && gameTime < oneHourAgo) ||
-          (game.status === 'finished' && gameTime < oneDayAgo);
+const validateTrashPlacement = (trashItems, gameMode = 'standard') => {
+  const config = GAME_MODES[gameMode];
+  if (!config) return false;
+  
+  // Calculate expected number of trash pieces based on fleet configuration
+  let expectedTrashPieces = 0;
+  config.fleet.forEach(ship => {
+    expectedTrashPieces += ship.count;
+  });
+  
+  return Array.isArray(trashItems) && trashItems.length === expectedTrashPieces;
+};
 
-        if (shouldCleanup) {
-          inMemoryGames.delete(gameId);
-          cleaned++;
-        }
+const makeMove = (game, playerAddress, row, col) => {
+  // Determine which player is making the move and which board to attack
+  const isPlayerA = game.playerA === playerAddress;
+  const isPlayerB = game.playerB === playerAddress;
+  
+  if (!isPlayerA && !isPlayerB) {
+    throw new Error('Player not in this garbage war');
+  }
+  
+  if (game.currentTurn !== playerAddress) {
+    throw new Error('Not your turn');
+  }
+  
+  // Get enemy trash and board
+  const enemyTrash = isPlayerA ? game.playerBTrash : game.playerATrash;
+  const enemyBoard = isPlayerA ? game.playerBBoard : game.playerABoard;
+  
+  // Check if cell already attacked
+  if (enemyBoard[row][col] === "hit" || enemyBoard[row][col] === "miss") {
+    throw new Error('Cell already attacked');
+  }
+  
+  // Check if there's trash at this position
+  let hit = false;
+  enemyTrash.forEach(trash => {
+    trash.forEach(([trashRow, trashCol]) => {
+      if (trashRow === row && trashCol === col) {
+        hit = true;
       }
-    }
-    
-    console.log(`🧹 Cleaned up ${cleaned} old games`);
-    return cleaned;
-  } catch (error) {
-    console.error('❌ Error during cleanup:', error);
-    return 0;
+    });
+  });
+  
+  // Update the board
+  enemyBoard[row][col] = hit ? "hit" : "miss";
+  
+  // Check for game end
+  const gameEnded = checkGameEnd(enemyBoard, enemyTrash);
+  
+  if (gameEnded) {
+    game.status = "finished";
+    game.winner = playerAddress;
+  } else {
+    // Switch turns
+    game.currentTurn = isPlayerA ? game.playerB : game.playerA;
   }
+  
+  game.updatedAt = Date.now();
+  
+  return { hit, gameEnded };
 };
 
-// Handle escrow refund
-const handleEscrowRefund = async (game) => {
-  try {
-    console.log(`💰 Processing escrow refund for game ${game.id}`);
-    
-    // Update escrow status
-    game.escrowStatus = 'refunded';
-    game.abandonReason = game.abandonReason || 'timeout';
-    
-    if (mongoConnected) {
-      await game.save();
-    }
-    
-    console.log(`✅ Escrow refunded for game ${game.id}`);
-    return true;
-  } catch (error) {
-    console.error(`❌ Error refunding escrow for game ${game.id}:`, error);
-    return false;
-  }
-};
+// API Routes
 
-// Get game count
-const getGameCount = async () => {
-  try {
-    if (mongoConnected) {
-      return await Game.countDocuments();
-    } else {
-      return inMemoryGames.size;
-    }
-  } catch (error) {
-    console.error('❌ Error getting game count:', error);
-    return 0;
-  }
-};
-
-// Health check endpoint
-app.get('/health', async (req, res) => {
-  try {
-    const gameCount = await getGameCount();
-    const status = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      gamesStored: gameCount,
-      version: '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-      database: mongoConnected ? 'MongoDB Atlas' : 'In-Memory',
-      mongoStatus: mongoConnected ? 'connected' : 'disconnected'
-    };
-    
-    console.log(`✅ Health check - ${gameCount} games stored (${mongoConnected ? 'MongoDB' : 'Memory'})`);
-    res.json(status);
-  } catch (error) {
-    console.error('❌ Health check error:', error);
-    res.status(500).json({ error: 'Health check failed' });
-  }
+// Root route - welcome message
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Gorbagana Trash Combat Backend API v2.0',
+    version: '2.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      stats: '/api/stats',
+      games: '/api/games',
+      createGame: 'POST /api/games',
+      getGame: 'GET /api/games/:gameId',
+      updateGame: 'PUT /api/games/:gameId',
+      joinGame: 'POST /api/games/:gameId/join',
+      publicGames: 'GET /api/games/public',
+      deleteGame: 'DELETE /api/games/:gameId'
+    },
+    rebuiltFrom: 'Working Trash Tac Toe patterns',
+    documentation: 'https://github.com/grich88/Gorbagana'
+  });
 });
 
-// Get all public games
-app.get('/api/games/public', async (req, res) => {
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    version: '2.0.0',
+    message: '🗑️ Gorbagana Trash Combat Backend v2.0 - Rebuilt using proven patterns from working Trash Tac Toe'
+  });
+});
+
+// Get server stats
+app.get('/api/stats', async (req, res) => {
   try {
-    let publicGames = [];
+    let stats;
     
-    if (mongoConnected) {
-      // MongoDB query
-      const games = await Game.find({
-        isPublic: true,
-        'gameState.phase': { $in: ['waiting', 'setup'] }
-      })
-      .select('id player1 player2 gameState isPublic creator createdAt updatedAt gameMode')
-      .sort({ createdAt: -1 })
-      .limit(20);
+    if (dbConnected) {
+      // Use MongoDB aggregation for stats
+      const [totalGames, activeGames, waitingGames, publicGames] = await Promise.all([
+        Game.countDocuments(),
+        Game.countDocuments({ status: 'playing' }),
+        Game.countDocuments({ status: 'waiting' }),
+        Game.countDocuments({ isPublic: true, status: 'waiting' })
+      ]);
       
-      publicGames = games.map(game => ({
-        id: game.id,
-        player1: game.player1,
-        player2: game.player2,
-        status: game.gameState.phase,
-        createdAt: game.createdAt,
-        updatedAt: game.updatedAt,
-        isPublic: game.isPublic,
-        creatorName: game.creator?.name || 'Anonymous Captain',
-        gameMode: game.gameMode
-      }));
+      stats = {
+        totalGarbageWars: totalGames,
+        activeGarbageWars: activeGames,
+        waitingGarbageWars: waitingGames,
+        publicGarbageWars: publicGames,
+        uptime: process.uptime(),
+        version: '2.0.0',
+        storage: 'MongoDB'
+      };
     } else {
-      // In-memory fallback
-      for (const [gameId, game] of inMemoryGames.entries()) {
-        if (game.isPublic && game.status === 'waiting') {
-          publicGames.push({
-            id: gameId,
-            player1: game.player1,
-            player2: game.player2,
-            status: game.status,
-            createdAt: game.createdAt,
-            updatedAt: game.updatedAt,
-            isPublic: game.isPublic,
-            creatorName: game.creatorName,
-          });
-        }
-      }
-      publicGames.sort((a, b) => b.createdAt - a.createdAt);
-      publicGames = publicGames.slice(0, 20);
+      // Use in-memory storage
+      stats = {
+        totalGarbageWars: games.size,
+        activeGarbageWars: Array.from(games.values()).filter(g => g.status === 'playing').length,
+        waitingGarbageWars: Array.from(games.values()).filter(g => g.status === 'waiting').length,
+        publicGarbageWars: Array.from(games.values()).filter(g => g.isPublic && g.status === 'waiting').length,
+        uptime: process.uptime(),
+        version: '2.0.0',
+        storage: 'In-Memory'
+      };
     }
     
-    console.log(`📋 Public games requested - ${publicGames.length} available (${mongoConnected ? 'MongoDB' : 'Memory'})`);
-    res.json(publicGames);
+    res.json({
+      success: true,
+      stats
+    });
   } catch (error) {
-    console.error('❌ Error fetching public games:', error);
-    res.status(500).json({ error: 'Failed to fetch public games' });
+    console.error('❌ Error fetching stats:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch stats: ' + error.message 
+    });
   }
 });
 
-// Get specific game by ID
-app.get('/api/games/:gameId', async (req, res) => {
-  try {
-    const gameId = req.params.gameId;
-    let game = null;
-    
-    if (mongoConnected) {
-      game = await Game.findOne({ id: gameId });
-      if (game) {
-        game = game.toObject();
-        
-        // Convert MongoDB format back to frontend format
-        const frontendGame = {
-          id: game.id,
-          player1: game.player1?.walletAddress || game.player1?.id || '',
-          player2: game.player2?.walletAddress || game.player2?.id || undefined,
-          player1Board: game.player1Board || new Array(100).fill(0),
-          player2Board: game.player2Board || undefined,
-          player1Salt: game.player1Salt || [],
-          player2Salt: game.player2Salt || undefined,
-          player1Commitment: game.player1Commitment || [],
-          player2Commitment: game.player2Commitment || [],
-          turn: game.gameState?.turn || game.turn || 1,
-          boardHits1: game.boardHits1 || new Array(100).fill(0),
-          boardHits2: game.boardHits2 || new Array(100).fill(0),
-          status: game.status || game.gameState?.phase || 'waiting',
-          winner: game.winner || (game.gameState?.winner ? parseInt(game.gameState.winner.replace('player', '')) : undefined),
-          createdAt: game.createdAt?.getTime() || Date.now(),
-          updatedAt: game.updatedAt?.getTime() || Date.now(),
-          isPublic: game.isPublic || false,
-          creatorName: game.creator?.name || game.player1?.name || 'Anonymous Captain',
-          wager: game.wagerAmount || game.wager || 0,
-          escrowAccount: game.escrowData?.escrowAccount || game.escrowAccount,
-          txSignature: game.txSignature,
-          phase: game.gameState?.phase || game.phase || 'setup'
-        };
-        
-        console.log(`📖 Game retrieved: ${gameId.slice(0, 8)}... (MongoDB)`);
-        return res.json(sanitizeGame(frontendGame));
-      }
-    } else {
-      game = inMemoryGames.get(gameId);
-    }
-    
-    if (!game) {
-      console.log(`❌ Game not found: ${gameId.slice(0, 8)}... (${mongoConnected ? 'MongoDB' : 'Memory'})`);
-      return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    console.log(`📖 Game retrieved: ${gameId.slice(0, 8)}... (Memory)`);
-    res.json(sanitizeGame(game));
-  } catch (error) {
-    console.error('❌ Error fetching game:', error);
-    res.status(500).json({ error: 'Failed to fetch game' });
-  }
+// Get game modes
+app.get('/api/game-modes', (req, res) => {
+  res.json({
+    success: true,
+    gameModes: GAME_MODES
+  });
 });
 
-// Save/Create game
+// Create a new garbage war
 app.post('/api/games', async (req, res) => {
   try {
     const gameData = req.body;
+    console.log('🎮 Creating new game with data:', JSON.stringify(gameData, null, 2));
     
     // Validate required fields
-    if (!gameData.id) {
-      return res.status(400).json({ error: 'Missing required field: id' });
+    if (!gameData.id || !gameData.playerA || !gameData.wager || !gameData.playerATrash) {
+      console.log('❌ Missing required fields:', {
+        id: !!gameData.id,
+        playerA: !!gameData.playerA,
+        wager: !!gameData.wager,
+        playerATrash: !!gameData.playerATrash
+      });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: id, playerA, wager, playerATrash' 
+      });
+    }
+    
+    // Determine game mode (default to 'standard' for backward compatibility)
+    const gameMode = gameData.gameMode || 'standard';
+    console.log('🎯 Game mode:', gameMode);
+    console.log('🗑️ Player A trash placement:', gameData.playerATrash);
+    
+    // Validate trash placement based on game mode
+    if (!validateTrashPlacement(gameData.playerATrash, gameMode)) {
+      const config = GAME_MODES[gameMode];
+      const expectedTrashPieces = config.fleet.reduce((sum, ship) => sum + ship.count, 0);
+      console.log('❌ Trash placement validation failed:', {
+        gameMode,
+        expected: expectedTrashPieces,
+        received: gameData.playerATrash.length,
+        trashData: gameData.playerATrash
+      });
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid trash placement for ${config.name} - must have exactly ${expectedTrashPieces} trash items, received ${gameData.playerATrash.length}` 
+      });
     }
 
-    // Check if this is the new MongoDB-compatible format
-    if (gameData.player1 && typeof gameData.player1 === 'object' && gameData.gameState) {
-      // New format from frontend - use as-is for MongoDB
-      gameData.updatedAt = new Date();
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      const gameDoc = new Game({
+        id: gameData.id,
+        playerA: {
+          publicKey: gameData.playerA,
+          board: createEmptyBoard(gameMode),
+          trash: gameData.playerATrash,
+          deposit: gameData.playerADeposit
+        },
+        currentTurn: gameData.playerA,
+        status: "waiting",
+        wager: gameData.wager,
+        isPublic: gameData.isPublic || false,
+        gameMode: gameMode,
+        escrowAccount: gameData.escrowAccount,
+        txSignature: gameData.txSignature
+      });
       
-      if (mongoConnected) {
-        try {
-          await Game.findOneAndUpdate(
-            { id: gameData.id },
-            gameData,
-            { 
-              upsert: true, 
-              new: true,
-              setDefaultsOnInsert: true
-            }
-          );
-          console.log(`💾 Game saved to MongoDB: ${gameData.id.slice(0, 8)}...`);
-          return res.json({ success: true, gameId: gameData.id });
-        } catch (mongoError) {
-          console.error('❌ MongoDB save failed:', mongoError);
-          // Fall through to in-memory storage
-        }
+      game = await gameDoc.save();
+      console.log(`🗑️ MongoDB: New garbage war created: ${game.id} by ${gameData.playerA} for ${gameData.wager} $GOR`);
+    } else {
+      // Fallback to in-memory storage
+      game = {
+        id: gameData.id,
+        playerA: gameData.playerA,
+        playerB: null,
+        playerABoard: createEmptyBoard(gameMode),
+        playerBBoard: createEmptyBoard(gameMode),
+        playerATrash: gameData.playerATrash,
+        playerBTrash: [],
+        currentTurn: gameData.playerA,
+        status: "waiting",
+        winner: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        wager: gameData.wager,
+        isPublic: gameData.isPublic || false,
+        gameMode: gameMode,
+        escrowAccount: gameData.escrowAccount,
+        txSignature: gameData.txSignature,
+        playerADeposit: gameData.playerADeposit,
+        playerBDeposit: null
+      };
+      
+      // Store game in memory
+      games.set(game.id, game);
+      
+      // Track games by player
+      if (!gamesByPlayer.has(gameData.playerA)) {
+        gamesByPlayer.set(gameData.playerA, new Set());
       }
+      gamesByPlayer.get(gameData.playerA).add(game.id);
+      
+      console.log(`🗑️ Memory: New garbage war created: ${game.id} by ${gameData.playerA} for ${gameData.wager} $GOR`);
     }
     
-    // Legacy format or fallback to in-memory storage
-    if (!gameData.player1) {
-      return res.status(400).json({ error: 'Missing required field: player1' });
-    }
-    
-    const game = deserializeGame(gameData);
-    game.updatedAt = Date.now();
-    
-    // In-memory fallback
-    inMemoryGames.set(game.id, game);
-    
-    // Add to history for analytics
-    gameHistory.push({
-      gameId: game.id,
-      action: inMemoryGames.has(game.id) ? 'updated' : 'created',
-      timestamp: Date.now(),
-      status: game.status,
-      isPublic: game.isPublic,
-    });
-    
-    if (gameHistory.length > 1000) {
-      gameHistory.splice(0, gameHistory.length - 1000);
-    }
-    console.log(`💾 Game saved to memory: ${game.id.slice(0, 8)}...`);
-    
-    res.json({ success: true, gameId: game.id });
-  } catch (error) {
-    console.error('❌ Error saving game:', error);
-    res.status(500).json({ error: 'Failed to save game' });
-  }
-});
-
-// Delete game
-app.delete('/api/games/:gameId', async (req, res) => {
-  try {
-    const gameId = req.params.gameId;
-    let deleted = false;
-    
-    if (mongoConnected) {
-      const result = await Game.deleteOne({ id: gameId });
-      deleted = result.deletedCount > 0;
-    } else {
-      deleted = inMemoryGames.delete(gameId);
-    }
-    
-    if (!deleted) {
-      console.log(`❌ Game not found for deletion: ${gameId.slice(0, 8)}... (${mongoConnected ? 'MongoDB' : 'Memory'})`);
-      return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    console.log(`🗑️ Game deleted: ${gameId.slice(0, 8)}... (${mongoConnected ? 'MongoDB' : 'Memory'})`);
-    res.json({ success: true, gameId });
-  } catch (error) {
-    console.error('❌ Error deleting game:', error);
-    res.status(500).json({ error: 'Failed to delete game' });
-  }
-});
-
-// Wager and Escrow Routes
-
-// Create escrow for game
-app.post('/api/games/:gameId/escrow', async (req, res) => {
-  try {
-    const gameId = req.params.gameId;
-    const { playerAddress, wagerAmount, transactionId } = req.body;
-    
-    if (!playerAddress || !wagerAmount || !transactionId) {
-      return res.status(400).json({ error: 'Missing required fields: playerAddress, wagerAmount, transactionId' });
-    }
-    
-    let game = null;
-    if (mongoConnected) {
-      game = await Game.findOne({ id: gameId });
-    } else {
-      game = inMemoryGames.get(gameId);
-    }
-    
-    if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    // Update escrow data
-    if (!game.escrowData) {
-      game.escrowData = { creatorDeposit: 0, opponentDeposit: 0, transactionIds: [] };
-    }
-    
-    const isCreator = game.creator?.id === playerAddress || game.player1?.id === playerAddress;
-    if (isCreator) {
-      game.escrowData.creatorDeposit = wagerAmount;
-      game.playersDeposited.player1 = true;
-    } else {
-      game.escrowData.opponentDeposit = wagerAmount;
-      game.playersDeposited.player2 = true;
-    }
-    
-    game.escrowData.transactionIds.push(transactionId);
-    game.wagerAmount = wagerAmount;
-    
-    // Check if both players have deposited
-    if (game.playersDeposited.player1 && game.playersDeposited.player2) {
-      game.escrowStatus = 'locked';
-    } else {
-      game.escrowStatus = 'pending';
-    }
-    
-    game.updatedAt = new Date();
-    
-    if (mongoConnected) {
-      await game.save();
-    } else {
-      inMemoryGames.set(gameId, game);
-    }
-    
-    console.log(`💰 Escrow deposit for game ${gameId.slice(0, 8)}... by ${playerAddress.slice(0, 8)}...`);
-    res.json({ success: true, escrowStatus: game.escrowStatus });
-  } catch (error) {
-    console.error('❌ Error handling escrow deposit:', error);
-    res.status(500).json({ error: 'Failed to process escrow deposit' });
-  }
-});
-
-// Abandon game and handle escrow
-app.post('/api/games/:gameId/abandon', async (req, res) => {
-  try {
-    const gameId = req.params.gameId;
-    const { playerAddress, reason } = req.body;
-    
-    if (!playerAddress) {
-      return res.status(400).json({ error: 'Missing playerAddress' });
-    }
-    
-    let game = null;
-    if (mongoConnected) {
-      game = await Game.findOne({ id: gameId });
-    } else {
-      game = inMemoryGames.get(gameId);
-    }
-    
-    if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    const isCreator = game.creator?.id === playerAddress || game.player1?.id === playerAddress;
-    const hasOpponent = game.player2 && game.player2.id;
-    const gameStarted = game.gameState.phase === 'playing' && game.moveHistory && game.moveHistory.length > 0;
-    
-    // Update game state
-    game.gameState.phase = 'abandoned';
-    game.abandonedBy = playerAddress;
-    game.abandonReason = reason || 'player_left';
-    game.updatedAt = new Date();
-    
-    // Handle escrow based on game state
-    let escrowAction = 'refund';
-    let beneficiary = null;
-    
-    if (game.wagerAmount > 0 && game.escrowStatus === 'locked') {
-      if (!hasOpponent || !gameStarted) {
-        // Game hasn't really started, refund both players
-        escrowAction = 'refund';
-        game.escrowStatus = 'refunded';
-      } else {
-        // Game started and someone abandoned, give to other player
-        beneficiary = isCreator ? game.player2?.id : game.player1?.id;
-        escrowAction = 'release';
-        game.escrowStatus = 'released';
-        game.gameState.winner = isCreator ? 'player2' : 'player1';
-      }
-    }
-    
-    if (mongoConnected) {
-      await game.save();
-    } else {
-      inMemoryGames.set(gameId, game);
-    }
-    
-    console.log(`🚪 Game ${gameId.slice(0, 8)}... abandoned by ${playerAddress.slice(0, 8)}... - Escrow: ${escrowAction}`);
     res.json({ 
       success: true, 
-      escrowAction,
-      beneficiary,
-      message: escrowAction === 'refund' ? 'Escrow will be refunded to both players' : `Escrow released to ${beneficiary}`
+      game,
+      message: 'Garbage war created successfully'
     });
+    
   } catch (error) {
-    console.error('❌ Error handling game abandonment:', error);
-    res.status(500).json({ error: 'Failed to abandon game' });
+    console.error('❌ Error creating garbage war:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to create garbage war: ' + error.message 
+    });
   }
 });
 
-// Claim winnings
-app.post('/api/games/:gameId/claim', async (req, res) => {
+// Get a specific garbage war
+app.get('/api/games/:gameId', async (req, res) => {
   try {
-    const gameId = req.params.gameId;
-    const { playerAddress } = req.body;
+    const { gameId } = req.params;
+    let game;
     
-    if (!playerAddress) {
-      return res.status(400).json({ error: 'Missing playerAddress' });
-    }
-    
-    let game = null;
-    if (mongoConnected) {
+    if (dbConnected) {
+      // Use MongoDB
       game = await Game.findOne({ id: gameId });
     } else {
-      game = inMemoryGames.get(gameId);
+      // Use in-memory storage
+      game = games.get(gameId);
     }
     
     if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Garbage war not found' 
+      });
     }
     
-    if (game.gameState.phase !== 'finished' || !game.gameState.winner) {
-      return res.status(400).json({ error: 'Game not finished or no winner' });
-    }
-    
-    const isWinner = 
-      (game.gameState.winner === 'player1' && (game.creator?.id === playerAddress || game.player1?.id === playerAddress)) ||
-      (game.gameState.winner === 'player2' && game.player2?.id === playerAddress);
-    
-    if (!isWinner) {
-      return res.status(403).json({ error: 'Only the winner can claim winnings' });
-    }
-    
-    if (game.escrowStatus === 'released') {
-      return res.status(400).json({ error: 'Winnings already claimed' });
-    }
-    
-    // Release escrow to winner
-    game.escrowStatus = 'released';
-    game.updatedAt = new Date();
-    
-    const totalWinnings = (game.escrowData.creatorDeposit || 0) + (game.escrowData.opponentDeposit || 0);
-    
-    if (mongoConnected) {
-      await game.save();
-    } else {
-      inMemoryGames.set(gameId, game);
-    }
-    
-    console.log(`🏆 Winnings claimed for game ${gameId.slice(0, 8)}... by ${playerAddress.slice(0, 8)}... - Amount: ${totalWinnings} GOR`);
     res.json({ 
       success: true, 
-      winnings: totalWinnings,
-      message: `${totalWinnings} GOR released to winner`
+      game 
     });
   } catch (error) {
-    console.error('❌ Error handling winnings claim:', error);
-    res.status(500).json({ error: 'Failed to claim winnings' });
+    console.error('❌ Error fetching garbage war:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch garbage war: ' + error.message 
+    });
   }
 });
 
-// Get escrow status
-app.get('/api/games/:gameId/escrow', async (req, res) => {
+// Update a garbage war
+app.put('/api/games/:gameId', (req, res) => {
   try {
-    const gameId = req.params.gameId;
+    const { gameId } = req.params;
+    const updates = req.body;
     
-    let game = null;
-    if (mongoConnected) {
-      game = await Game.findOne({ id: gameId });
-    } else {
-      game = inMemoryGames.get(gameId);
-    }
-    
+    const game = games.get(gameId);
     if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+      return res.status(404).json({ error: 'Garbage war not found' });
     }
     
-    const escrowInfo = {
-      gameId: game.id,
-      wagerAmount: game.wagerAmount || 0,
-      escrowStatus: game.escrowStatus || 'none',
-      escrowData: game.escrowData || {},
-      playersDeposited: game.playersDeposited || { player1: false, player2: false },
-      canClaim: game.gameState.phase === 'finished' && game.gameState.winner && game.escrowStatus === 'locked'
+    // Apply updates
+    const updatedGame = {
+      ...game,
+      ...updates,
+      updatedAt: Date.now()
     };
     
-    res.json(escrowInfo);
+    games.set(gameId, updatedGame);
+    
+    console.log(`📝 Updated Trash Combat game: ${gameId}`, {
+      updates: Object.keys(updates),
+      status: updatedGame.status,
+      SEQUENCE_TIMESTAMP: Date.now(),
+      SEQUENCE_EVENT: 'GAME_UPDATE'
+    });
+    
+    res.json({ success: true, game: updatedGame });
   } catch (error) {
-    console.error('❌ Error fetching escrow status:', error);
-    res.status(500).json({ error: 'Failed to fetch escrow status' });
+    console.error('Error updating game:', error);
+    res.status(500).json({ error: 'Failed to update game' });
   }
 });
 
-// Analytics endpoint
-app.get('/api/analytics', async (req, res) => {
+// Join a garbage war
+app.post('/api/games/:gameId/join', (req, res) => {
   try {
-    let analytics;
+    const { gameId } = req.params;
+    const { playerAddress, playerBDeposit, playerBTrash } = req.body;
     
-    if (mongoConnected) {
-      const totalGames = await Game.countDocuments();
-      const activeGames = await Game.countDocuments({
-        'gameState.phase': { $in: ['playing', 'waiting', 'setup'] }
+    const game = games.get(gameId);
+    
+    if (!game) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Garbage war not found' 
       });
-      const finishedGames = await Game.countDocuments({
-        'gameState.phase': 'finished'
-      });
-      const publicGames = await Game.countDocuments({ isPublic: true });
-      
-      analytics = {
-        totalGames,
-        activeGames,
-        finishedGames,
-        publicGames,
-        averageGameDuration: 0, // Would need to calculate
-        storage: 'MongoDB Atlas',
-        timestamp: new Date().toISOString()
-      };
-    } else {
-      const totalGames = inMemoryGames.size;
-      let activeGames = 0;
-      let finishedGames = 0;
-      let publicGames = 0;
-      
-      for (const [, game] of inMemoryGames.entries()) {
-        if (game.status === 'playing' || game.status === 'waiting') activeGames++;
-        if (game.status === 'finished') finishedGames++;
-        if (game.isPublic) publicGames++;
-      }
-      
-      analytics = {
-        totalGames,
-        activeGames,
-        finishedGames,
-        publicGames,
-        gameHistory: gameHistory.length,
-        storage: 'In-Memory',
-        timestamp: new Date().toISOString()
-      };
     }
     
-    console.log(`📊 Analytics requested - ${analytics.totalGames} total games (${mongoConnected ? 'MongoDB' : 'Memory'})`);
-    res.json(analytics);
+    if (game.status !== 'waiting') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Garbage war is not waiting for players' 
+      });
+    }
+    
+    if (game.playerB) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Garbage war is already full' 
+      });
+    }
+    
+    if (game.playerA === playerAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Cannot join your own garbage war' 
+      });
+    }
+    
+    // Update game with second player
+    game.playerB = playerAddress;
+    game.playerBDeposit = playerBDeposit;
+    game.playerBTrash = playerBTrash || []; // Trash will be placed separately
+    game.updatedAt = Date.now();
+    
+    // If both players have trash, start the war
+    if (playerBTrash && validateTrashPlacement(playerBTrash, game.gameMode || 'standard')) {
+      game.status = 'playing';
+    } else {
+      game.status = 'setup'; // Waiting for Player B to place trash
+    }
+    
+    // Track games by player
+    if (!gamesByPlayer.has(playerAddress)) {
+      gamesByPlayer.set(playerAddress, new Set());
+    }
+    gamesByPlayer.get(playerAddress).add(gameId);
+    
+    console.log(`👥 Player ${playerAddress} joined garbage war ${gameId}`);
+    
+    res.json({ 
+      success: true, 
+      game,
+      message: 'Successfully joined garbage war'
+    });
+    
   } catch (error) {
-    console.error('❌ Error fetching analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch analytics' });
+    console.error('❌ Error joining garbage war:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to join garbage war: ' + error.message 
+    });
   }
 });
 
-// Batch operations
-app.post('/api/games/batch', async (req, res) => {
+// Get public garbage wars
+app.get('/api/games/public', async (req, res) => {
   try {
-    const { operation, gameIds } = req.body;
+    let publicGarbageWars;
     
-    if (operation === 'delete' && Array.isArray(gameIds)) {
-      let deletedCount = 0;
+    if (dbConnected) {
+      // Use MongoDB
+      const games = await Game.find({ 
+        isPublic: true, 
+        status: 'waiting' 
+      })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('id playerA.publicKey wager createdAt status gameMode');
       
-      if (mongoConnected) {
-        const result = await Game.deleteMany({ id: { $in: gameIds } });
-        deletedCount = result.deletedCount;
-      } else {
-        for (const gameId of gameIds) {
-          if (inMemoryGames.delete(gameId)) {
-            deletedCount++;
-          }
-        }
-      }
-      
-      console.log(`🗑️ Batch delete: ${deletedCount}/${gameIds.length} games deleted (${mongoConnected ? 'MongoDB' : 'Memory'})`);
-      res.json({ success: true, deletedCount, total: gameIds.length });
+      publicGarbageWars = games.map(game => ({
+        id: game.id,
+        playerA: game.playerA.publicKey,
+        wager: game.wager,
+        createdAt: game.createdAt,
+        status: game.status,
+        gameMode: game.gameMode
+      }));
     } else {
-      res.status(400).json({ error: 'Invalid batch operation' });
+      // Use in-memory storage
+      publicGarbageWars = Array.from(games.values())
+        .filter(game => game.isPublic && game.status === 'waiting')
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 20) // Limit to 20 most recent
+        .map(game => ({
+          id: game.id,
+          playerA: game.playerA,
+          wager: game.wager,
+          createdAt: game.createdAt,
+          status: game.status,
+          gameMode: game.gameMode
+        }));
+    }
+    
+    res.json({ 
+      success: true, 
+      games: publicGarbageWars,
+      count: publicGarbageWars.length 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching public garbage wars:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch public garbage wars: ' + error.message 
+    });
+  }
+});
+
+// Update trash placement for Player B
+app.post('/api/games/:gameId/ships', (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const { playerAddress, ships } = req.body;
+    
+    const game = games.get(gameId);
+    
+    if (!game) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Garbage war not found' 
+      });
+    }
+    
+    if (game.playerB !== playerAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Only Player B can set trash for this garbage war' 
+      });
+    }
+    
+    // Validate trash placement based on game mode
+    const gameMode = game.gameMode || 'standard';
+    if (!validateTrashPlacement(ships, gameMode)) {
+      const config = GAME_MODES[gameMode];
+      const expectedTrashPieces = config.fleet.reduce((sum, ship) => sum + ship.count, 0);
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid trash placement for ${config.name} - must have exactly ${expectedTrashPieces} trash items` 
+      });
+    }
+    
+    game.playerBTrash = ships;
+    game.status = 'playing';
+    game.updatedAt = Date.now();
+    
+    console.log(`🗑️ Player B placed trash in garbage war ${gameId}`);
+    
+    res.json({ 
+      success: true, 
+      game,
+      message: 'Trash placed successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error placing trash:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to place trash: ' + error.message 
+    });
+  }
+});
+
+// Make a move
+app.post('/api/games/:gameId/move', (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const { playerAddress, row, col } = req.body;
+    
+    const game = games.get(gameId);
+    
+    if (!game) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Garbage war not found' 
+      });
+    }
+    
+    if (game.status !== 'playing') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Garbage war is not in playing state' 
+      });
+    }
+    
+    // Validate coordinates based on game mode
+    const gameMode = game.gameMode || 'standard';
+    const boardSize = GAME_MODES[gameMode].boardSize;
+    if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid coordinates for ${GAME_MODES[gameMode].name} (${boardSize}x${boardSize} board)` 
+      });
+    }
+    
+    // Make the move
+    const result = makeMove(game, playerAddress, row, col);
+    
+    console.log(`💥 ${playerAddress} attacked (${row},${col}) in garbage war ${gameId} - ${result.hit ? 'TRASH HIT' : 'MISSED GARBAGE'}`);
+    
+    if (result.gameEnded) {
+      console.log(`🏆 Garbage war ${gameId} ended - Winner: ${game.winner}`);
+    }
+    
+    res.json({ 
+      success: true, 
+      game,
+      hit: result.hit,
+      gameEnded: result.gameEnded,
+      message: result.hit ? 'Trash hit!' : 'Missed the garbage!'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error making move:', error);
+    res.status(400).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Get player's garbage wars
+app.get('/api/players/:playerAddress/games', (req, res) => {
+  try {
+    const { playerAddress } = req.params;
+    const playerGames = gamesByPlayer.get(playerAddress) || new Set();
+    
+    const gamesList = Array.from(playerGames)
+      .map(gameId => games.get(gameId))
+      .filter(game => game) // Remove any null games
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    
+    res.json({ 
+      success: true, 
+      games: gamesList,
+      count: gamesList.length 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching player garbage wars:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch player garbage wars: ' + error.message 
+    });
+  }
+});
+
+// Abandon garbage war (for cleanup)
+app.post('/api/games/:gameId/abandon', (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const { playerAddress, reason } = req.body;
+    
+    const game = games.get(gameId);
+    
+    if (!game) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Garbage war not found' 
+      });
+    }
+    
+    if (game.playerA !== playerAddress && game.playerB !== playerAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'You are not a player in this garbage war' 
+      });
+    }
+    
+    game.status = 'abandoned';
+    game.abandonReason = reason || 'Player abandoned';
+    game.updatedAt = Date.now();
+    
+    console.log(`🏃 Garbage war ${gameId} abandoned by ${playerAddress}: ${game.abandonReason}`);
+    
+    res.json({ 
+      success: true, 
+      game,
+      message: 'Garbage war abandoned'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error abandoning garbage war:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to abandon garbage war: ' + error.message 
+    });
+  }
+});
+
+// Forfeit garbage war (opponent wins)
+app.post('/api/games/:gameId/forfeit', (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const { playerAddress, winner, reason } = req.body;
+    
+    const game = games.get(gameId);
+    
+    if (!game) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Garbage war not found' 
+      });
+    }
+    
+    if (game.playerA !== playerAddress && game.playerB !== playerAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'You are not a player in this garbage war' 
+      });
+    }
+    
+    // Set opponent as winner
+    game.status = 'finished';
+    game.winner = winner;
+    game.abandonReason = reason || 'Player forfeited';
+    game.updatedAt = Date.now();
+    
+    console.log(`🏳️ Garbage war ${gameId} forfeited by ${playerAddress} - Winner: ${winner}`);
+    
+    res.json({ 
+      success: true, 
+      game,
+      message: 'Garbage war forfeited'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error forfeiting garbage war:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to forfeit garbage war: ' + error.message 
+    });
+  }
+});
+
+// Track payout status
+app.post('/api/games/:gameId/payout', (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const { payoutType, winner, processed } = req.body;
+    
+    const game = games.get(gameId);
+    
+    if (!game) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Garbage war not found' 
+      });
+    }
+    
+    // Track payout information
+    game.payoutProcessed = processed;
+    game.payoutType = payoutType;
+    game.payoutWinner = winner;
+    game.payoutTimestamp = Date.now();
+    game.updatedAt = Date.now();
+    
+    console.log(`💰 Payout processed for garbage war ${gameId}: ${payoutType} to ${winner || 'players'}`);
+    
+    res.json({ 
+      success: true, 
+      game,
+      message: 'Payout status updated'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error tracking payout:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to track payout: ' + error.message 
+    });
+  }
+});
+
+// Delete a garbage war
+app.delete('/api/games/:gameId', (req, res) => {
+  try {
+    const { gameId } = req.params;
+    
+    const deleted = games.delete(gameId);
+    publicGames.delete(gameId);
+    
+    if (deleted) {
+      console.log(`🗑️ Deleted garbage war: ${gameId}`);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Garbage war not found' });
     }
   } catch (error) {
-    console.error('❌ Error in batch operation:', error);
-    res.status(500).json({ error: 'Batch operation failed' });
+    console.error('Error deleting garbage war:', error);
+    res.status(500).json({ error: 'Failed to delete garbage war' });
   }
 });
 
 // Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('❌ Server error:', error);
+app.use((err, req, res, next) => {
+  console.error('❌ Server error:', err);
   res.status(500).json({ 
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    success: false, 
+    error: 'Internal server error' 
   });
 });
 
 // 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+app.use((req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    error: 'Endpoint not found' 
+  });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully...');
-  
-  if (mongoConnected) {
-    await dbConnection.disconnect();
-  }
-  
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  console.log('🛑 SIGINT received, shutting down gracefully...');
-  
-  if (mongoConnected) {
-    await dbConnection.disconnect();
-  }
-  
-  process.exit(0);
-});
-
-// Start server
+// Start server with database initialization
 const startServer = async () => {
-  try {
-    // Initialize database first
-    await initializeDatabase();
-    
-    // Run cleanup on startup
-    await cleanupOldGames();
-    
-    // Start the server
-    app.listen(PORT, () => {
-      console.log('\n🚀🚀🚀 GORCHAIN BATTLESHIP BACKEND STARTED 🚀🚀🚀');
-      console.log(`⚓ Server running on http://localhost:${PORT}`);
-      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-      console.log(`📋 Public games: http://localhost:${PORT}/api/games/public`);
-      console.log(`📊 Analytics: http://localhost:${PORT}/api/analytics`);
-      console.log('🛡️ CORS enabled for frontend development');
-      console.log(`💾 Storage: ${mongoConnected ? 'MongoDB Atlas (persistent)' : 'In-Memory (temporary)'}`);
-      console.log('✅ Ready to handle battleship games!\n');
-    });
-    
-    // Schedule periodic cleanup
-    setInterval(cleanupOldGames, 24 * 60 * 60 * 1000); // Daily cleanup
-    
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
+  // Initialize database connection
+  await initializeServer();
+  
+  // Start the Express server
+  app.listen(PORT, () => {
+    console.log(`🚀 Gorbagana Trash Combat Backend v2.0 running on port ${PORT}`);
+    console.log(`🌐 Server URL: http://localhost:${PORT}`);
+    console.log('✅ Using proven patterns from working Trash Tac Toe app');
+    console.log(`🗑️ Ready to handle Trash Combat wars with real $GOR wagering`);
+    console.log(`💾 Storage: ${dbConnected ? 'MongoDB' : 'In-Memory (Development)'}`);
+  });
 };
 
 // Start the server
-startServer(); 
+startServer().catch(error => {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
+}); 

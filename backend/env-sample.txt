@@ -1,11 +1,17 @@
 # Copy this file to .env and update the values for your setup
 
 # MongoDB Configuration (Choose one)
-# Option 1: Local MongoDB
+# Option 1: Local MongoDB  
 MONGODB_URI=mongodb://localhost:27017/gorbagana-battleship
 
 # Option 2: MongoDB Atlas (Cloud) - Get this from your MongoDB Atlas cluster
 # MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/gorbagana-battleship
+
+# Option 3: Docker/Container deployment
+# MONGODB_URI=mongodb://mongo:27017/gorbagana-battleship
+
+# Option 4: Railway/Render with external MongoDB
+# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/gorbagana-battleship?retryWrites=true&w=majority
 
 # Server Configuration
 PORT=3002

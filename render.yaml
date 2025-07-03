@@ -4,17 +4,29 @@ services:
     name: gorbagana-battleship-backend
     runtime: node
     plan: starter  # Free tier
-    buildCommand: cd backend && npm install && npm run build
+    buildCommand: cd backend && npm install
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3002
-      - key: CORS_ORIGIN
-        value: https://gorbagana-battleship-frontend.onrender.com
       - key: MONGODB_URI
-        sync: false  # Set manually in Render dashboard
+        sync: false  # Set manually in Render dashboard to: mongodb+srv://battleship-user:battle123@cluster0.trwqa4n.mongodb.net/gorbagana-battleship?retryWrites=true&w=majority&appName=Cluster0
+      - key: FRONTEND_URL
+        value: https://gorbagana-battleship-frontend.onrender.com
+      - key: GAME_CLEANUP_INTERVAL
+        value: 3600000
+      - key: MAX_GAMES_PER_USER
+        value: 10
+      - key: GAME_TIMEOUT
+        value: 7200000
+      - key: RATE_LIMIT_WINDOW
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      - key: LOG_LEVEL
+        value: info
     healthCheckPath: /health
     region: oregon  # or virginia, frankfurt, singapore
     
@@ -32,8 +44,13 @@ services:
         value: https://gorbagana-battleship-backend.onrender.com
       - key: NEXT_PUBLIC_RPC_PRIMARY
         value: https://rpc.gorbagana.wtf/
-      - key: NEXT_PUBLIC_RPC_SECONDARY  
-        value: https://gorchain.wstf.io
       - key: NEXT_PUBLIC_RPC_FALLBACK
         value: https://api.devnet.solana.com
-    region: oregon  # Same region as backend for lower latency 
+    region: oregon  # Same region as backend for lower latency
+    
+# Deployment Instructions:
+# 1. Connect your GitHub repository to Render
+# 2. Use this render.yaml as blueprint
+# 3. Set MONGODB_URI environment variable manually in Render dashboard:
+#    mongodb+srv://battleship-user:battle123@cluster0.trwqa4n.mongodb.net/gorbagana-battleship?retryWrites=true&w=majority&appName=Cluster0
+# 4. Both services will auto-deploy when you push to main branch 

@@ -1,79 +1,51 @@
 const mongoose = require('mongoose');
 
-class DatabaseConnection {
-  constructor() {
-    this.connection = null;
-    this.isConnected = false;
-  }
+// MongoDB Connection Configuration
+const connectDB = async () => {
+  try {
+    // Use environment variable or fallback to local MongoDB
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/gorbagana-battleship';
+    
+    console.log('🗄️ Connecting to MongoDB...');
+    console.log('📍 Database URI:', mongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')); // Hide credentials in logs
+    
+    const conn = await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
 
-  async connect(connectionString) {
-    try {
-      if (this.isConnected) {
-        console.log('📚 Database already connected');
-        return this.connection;
-      }
-
-      console.log('🔌 Connecting to MongoDB...');
-      
-      const connection = await mongoose.connect(connectionString, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-      });
-
-      this.connection = connection;
-      this.isConnected = true;
-
-      console.log('✅ MongoDB connected successfully');
-      console.log(`🏠 Database: ${connection.connection.name}`);
-      console.log(`🌐 Host: ${connection.connection.host}:${connection.connection.port}`);
-
-      // Handle connection events
-      mongoose.connection.on('error', (err) => {
-        console.error('❌ MongoDB connection error:', err);
-        this.isConnected = false;
-      });
-
-      mongoose.connection.on('disconnected', () => {
-        console.log('💔 MongoDB disconnected');
-        this.isConnected = false;
-      });
-
-      mongoose.connection.on('reconnected', () => {
-        console.log('🔄 MongoDB reconnected');
-        this.isConnected = true;
-      });
-
-      return connection;
-    } catch (error) {
-      console.error('❌ Failed to connect to MongoDB:', error.message);
-      this.isConnected = false;
-      throw error;
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`🗑️ Database: ${conn.connection.name}`);
+    
+    return conn;
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    
+    // In development, continue without database (use in-memory fallback)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('⚠️ Running in development mode - continuing without MongoDB');
+      return null;
     }
+    
+    // In production, exit if no database connection
+    process.exit(1);
   }
+};
 
-  async disconnect() {
-    try {
-      if (this.connection) {
-        await mongoose.disconnect();
-        this.isConnected = false;
-        console.log('👋 MongoDB disconnected');
-      }
-    } catch (error) {
-      console.error('❌ Error disconnecting from MongoDB:', error);
-    }
-  }
+// Connection event handlers
+mongoose.connection.on('disconnected', () => {
+  console.log('📤 MongoDB Disconnected');
+});
 
-  getStatus() {
-    return {
-      connected: this.isConnected,
-      readyState: mongoose.connection.readyState,
-      host: mongoose.connection.host,
-      name: mongoose.connection.name
-    };
-  }
-}
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB Error:', err);
+});
 
-// Export singleton instance
-module.exports = new DatabaseConnection(); 
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  console.log('🔴 MongoDB connection closed through app termination');
+  process.exit(0);
+});
+
+module.exports = connectDB; 

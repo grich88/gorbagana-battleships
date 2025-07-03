@@ -1,83 +1,59 @@
-# Gorbagana Battleship - Development Startup Script
-# Starts both frontend and backend servers for enhanced battleship game
+# Gorbagana Battleship Development Server v2.0
+# Rebuilt using proven patterns from working Trash Tac Toe app
 
-Write-Host "🚀🚀🚀 STARTING GORBAGANA BATTLESHIP DEVELOPMENT ENVIRONMENT 🚀🚀🚀" -ForegroundColor Green
+Write-Host "🚀 Starting Gorbagana Battleship v2.0 Development Servers" -ForegroundColor Green
+Write-Host "✅ Using proven patterns from working Trash Tac Toe app" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if Node.js is installed
 try {
     $nodeVersion = node --version
-    Write-Host "✅ Node.js detected: $nodeVersion" -ForegroundColor Green
+    Write-Host "✅ Node.js version: $nodeVersion" -ForegroundColor Green
 } catch {
-    Write-Host "❌ Node.js not found. Please install Node.js first." -ForegroundColor Red
+    Write-Host "❌ Node.js is not installed. Please install Node.js first." -ForegroundColor Red
     exit 1
 }
-
-# Function to start a process in a new terminal
-function Start-InNewTerminal {
-    param(
-        [string]$Command,
-        [string]$WorkingDirectory,
-        [string]$Title
-    )
-    
-    $fullCommand = "cd '$WorkingDirectory'; $Command"
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", $fullCommand -WindowStyle Normal
-    Write-Host "✅ Started $Title in new terminal" -ForegroundColor Green
-}
-
-Write-Host "📦 Installing dependencies..." -ForegroundColor Yellow
 
 # Install backend dependencies
-Write-Host "Installing backend dependencies..." -ForegroundColor Cyan
-Push-Location "backend"
-npm install --silent
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Backend dependency installation failed" -ForegroundColor Red
-    Pop-Location
-    exit 1
+Write-Host "📦 Installing backend dependencies..." -ForegroundColor Yellow
+Set-Location backend
+if (-not (Test-Path "node_modules")) {
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Backend dependency installation failed" -ForegroundColor Red
+        exit 1
+    }
 }
-Pop-Location
 
 # Install frontend dependencies
-Write-Host "Installing frontend dependencies..." -ForegroundColor Cyan
-Push-Location "frontend"
-npm install --silent
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Frontend dependency installation failed" -ForegroundColor Red
-    Pop-Location
-    exit 1
+Write-Host "📦 Installing frontend dependencies..." -ForegroundColor Yellow
+Set-Location ../frontend
+if (-not (Test-Path "node_modules")) {
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Frontend dependency installation failed" -ForegroundColor Red
+        exit 1
+    }
 }
-Pop-Location
 
+# Return to root directory
+Set-Location ..
+
+Write-Host "🎯 Starting both servers..." -ForegroundColor Cyan
 Write-Host ""
-Write-Host "🚀 Starting servers..." -ForegroundColor Yellow
+Write-Host "🔥 Backend: http://localhost:3002" -ForegroundColor Yellow
+Write-Host "🔥 Frontend: http://localhost:3000" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "🌐 Official Gorbagana RPC: https://rpc.gorbagana.wtf/" -ForegroundColor Magenta
+Write-Host "💰 Ready for real $GOR token wagering!" -ForegroundColor Green
+Write-Host ""
+Write-Host "Press Ctrl+C to stop both servers" -ForegroundColor Gray
+Write-Host ""
 
-# Start backend server
-$backendPath = Join-Path $PWD "backend"
-Start-InNewTerminal "npm run dev" $backendPath "Backend API Server (Port 3002)"
-
-# Wait a moment for backend to start
+# Start both servers concurrently
+Start-Process PowerShell -ArgumentList "-NoExit", "-Command", "cd backend; Write-Host '🔥 BACKEND SERVER STARTING' -ForegroundColor Red; npm run dev"
 Start-Sleep -Seconds 2
+Start-Process PowerShell -ArgumentList "-NoExit", "-Command", "cd frontend; Write-Host '🔥 FRONTEND SERVER STARTING' -ForegroundColor Blue; npm run dev"
 
-# Start frontend server
-$frontendPath = Join-Path $PWD "frontend"
-Start-InNewTerminal "npm run dev" $frontendPath "Frontend Game Interface (Port 3000)"
-
-Write-Host ""
-Write-Host "🎯 Servers starting up..." -ForegroundColor Green
-Write-Host "⚓ Backend API:     http://localhost:3002" -ForegroundColor Cyan
-Write-Host "🎮 Frontend Game:   http://localhost:3000" -ForegroundColor Cyan
-Write-Host "📊 API Analytics:   http://localhost:3002/api/analytics" -ForegroundColor Cyan
-Write-Host "🔗 Health Check:    http://localhost:3002/health" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "📱 Enhanced Features Active:" -ForegroundColor Yellow
-Write-Host "  ✅ Cross-device game sharing" -ForegroundColor White
-Write-Host "  ✅ Public games lobby" -ForegroundColor White  
-Write-Host "  ✅ Real-time synchronization" -ForegroundColor White
-Write-Host "  ✅ Enhanced wallet integration" -ForegroundColor White
-Write-Host "  ✅ Mock blockchain for development" -ForegroundColor White
-Write-Host ""
-Write-Host "🎮 Ready to play Enhanced Gorbagana Battleship!" -ForegroundColor Green
-Write-Host "Press any key to exit this script (servers will continue running)..." -ForegroundColor Gray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") 
+Write-Host "✅ Both servers are starting..." -ForegroundColor Green
+Write-Host "🎮 Ready to play Gorbagana Battleship!" -ForegroundColor Cyan 

@@ -761,6 +761,23 @@ const BattleshipGame: React.FC = () => {
     resetShips();
   };
 
+  const goBack = () => {
+    if (battleshipGame) {
+      // If in active game, show confirmation
+      if (confirm('Are you sure you want to leave this game? You may lose your wager.')) {
+        abandonGame();
+      }
+    } else if (!showGameModeSelector) {
+      // Go back to game mode selector
+      setShowGameModeSelector(true);
+      setGamePhase('setup');
+      resetShips();
+    } else {
+      // If on game mode selector, could go to landing page
+      toast('Use browser back button to return to landing page');
+    }
+  };
+
   const handleBoardHover = (x: number, y: number) => {
     if (gamePhase === 'placement' && currentShipIndex < shipsToPlace.length) {
       const currentShip = shipsToPlace[currentShipIndex];
@@ -989,6 +1006,17 @@ const BattleshipGame: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-lg shadow-lg p-8">
+            {/* Back Button */}
+            <div className="mb-6">
+              <button
+                onClick={goBack}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
+            </div>
+            
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold text-gray-800 mb-4">🗑️ Choose Collection Mode</h1>
               <p className="text-gray-600">Select your preferred waste management style for the ultimate trash collection experience</p>
@@ -1045,6 +1073,19 @@ const BattleshipGame: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto py-8 space-y-8">
+      {/* Back Button */}
+      {!showGameModeSelector && (
+        <div className="mb-6">
+          <button
+            onClick={goBack}
+            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {battleshipGame ? 'Leave Game' : 'Back to Game Modes'}
+          </button>
+        </div>
+      )}
+      
       {/* Step 1: Game Mode Selection */}
       <section>
         <h2 className="text-xl font-bold mb-2">Step 1: Select Game Mode</h2>

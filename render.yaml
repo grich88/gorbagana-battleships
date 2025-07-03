@@ -9,11 +9,12 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3002
+      # Note: PORT is automatically set by Render (typically 10000)
       - key: MONGODB_URI
         sync: false  # Set manually in Render dashboard to: mongodb+srv://battleship-user:battle123@cluster0.trwqa4n.mongodb.net/gorbagana-battleship?retryWrites=true&w=majority&appName=Cluster0
       - key: FRONTEND_URL
+        value: https://gorbagana-battleship-frontend.onrender.com
+      - key: CORS_ORIGIN
         value: https://gorbagana-battleship-frontend.onrender.com
       - key: GAME_CLEANUP_INTERVAL
         value: 3600000

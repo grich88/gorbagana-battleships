@@ -510,41 +510,51 @@ app.put('/api/games/:gameId', async (req, res) => {
 // Join a garbage war
 app.post('/api/games/:gameId/join', async (req, res) => {
   try {
+    console.log(`🎯 JOIN REQUEST: gameId=${req.params.gameId}, body=`, JSON.stringify(req.body, null, 2));
+    
     const { gameId } = req.params;
     const { playerAddress, playerBDeposit, playerBTrash } = req.body;
+    
+    console.log(`🔍 Looking for game ${gameId} using ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
     
     let game;
     
     if (dbConnected) {
       // Use MongoDB
+      console.log(`📊 MongoDB query: Game.findOne({ id: "${gameId}" })`);
       game = await Game.findOne({ id: gameId });
+      console.log(`📊 MongoDB result:`, game ? `Found game with status=${game.status}` : 'No game found');
     } else {
       // Use in-memory storage
       game = games.get(gameId);
+      console.log(`💾 In-memory result:`, game ? `Found game with status=${game.status}` : 'No game found');
     }
     
     if (!game) {
+      console.log(`❌ Game ${gameId} not found in ${dbConnected ? 'MongoDB' : 'In-Memory'} storage`);
       return res.status(404).json({ 
         success: false, 
         error: 'Garbage war not found' 
       });
     }
     
-    if (game.status !== 'waiting') {
+        if (game.status !== 'waiting') {
       return res.status(400).json({ 
         success: false, 
         error: 'Garbage war is not waiting for players' 
       });
     }
-    
+
     if (game.playerB) {
       return res.status(400).json({ 
         success: false, 
         error: 'Garbage war is already full' 
       });
     }
-    
-    if (game.playerA === playerAddress) {
+
+    // Check if player is trying to join their own game (handle both storage types)
+    const playerAKey = dbConnected ? game.playerA.publicKey : game.playerA;
+    if (playerAKey === playerAddress) {
       return res.status(400).json({ 
         success: false, 
         error: 'Cannot join your own garbage war' 
@@ -553,6 +563,9 @@ app.post('/api/games/:gameId/join', async (req, res) => {
     
     // Update game with second player
     if (dbConnected) {
+      console.log(`📝 Updating MongoDB game with playerB data`);
+      console.log(`📝 playerBTrash format:`, JSON.stringify(playerBTrash, null, 2));
+      
       // Update MongoDB document
       game.playerB = {
         publicKey: playerAddress,
@@ -562,14 +575,21 @@ app.post('/api/games/:gameId/join', async (req, res) => {
       };
       game.updatedAt = Date.now();
       
+      console.log(`📝 Created playerB object:`, JSON.stringify(game.playerB, null, 2));
+      
       // If both players have trash, start the war
       if (playerBTrash && validateTrashPlacement(playerBTrash, game.gameMode || 'standard')) {
         game.status = 'playing';
+        console.log(`✅ Trash validation passed - setting status to 'playing'`);
       } else {
         game.status = 'setup'; // Waiting for Player B to place trash
+        console.log(`⏳ No trash provided - setting status to 'setup'`);
       }
       
+      console.log(`💾 Saving game to MongoDB...`);
       await game.save();
+      console.log(`✅ Game saved successfully to MongoDB`);
+    }
     } else {
       // Update in-memory storage
       game.playerB = playerAddress;
@@ -601,6 +621,12 @@ app.post('/api/games/:gameId/join', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error joining garbage war:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error details:', {
+      message: error.message,
+      name: error.name,
+      code: error.code
+    });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to join garbage war: ' + error.message 

@@ -459,33 +459,48 @@ app.get('/api/games/:gameId', async (req, res) => {
 });
 
 // Update a garbage war
-app.put('/api/games/:gameId', (req, res) => {
+app.put('/api/games/:gameId', async (req, res) => {
   try {
     const { gameId } = req.params;
     const updates = req.body;
     
-    const game = games.get(gameId);
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      game = await Game.findOne({ id: gameId });
+    } else {
+      // Use in-memory storage
+      game = games.get(gameId);
+    }
+    
     if (!game) {
       return res.status(404).json({ error: 'Garbage war not found' });
     }
     
     // Apply updates
-    const updatedGame = {
-      ...game,
-      ...updates,
-      updatedAt: Date.now()
-    };
-    
-    games.set(gameId, updatedGame);
+    if (dbConnected) {
+      Object.assign(game, updates);
+      game.updatedAt = Date.now();
+      await game.save();
+    } else {
+      const updatedGame = {
+        ...game,
+        ...updates,
+        updatedAt: Date.now()
+      };
+      games.set(gameId, updatedGame);
+      game = updatedGame;
+    }
     
     console.log(`📝 Updated Trash Combat game: ${gameId}`, {
       updates: Object.keys(updates),
-      status: updatedGame.status,
+      status: game.status,
       SEQUENCE_TIMESTAMP: Date.now(),
       SEQUENCE_EVENT: 'GAME_UPDATE'
     });
     
-    res.json({ success: true, game: updatedGame });
+    res.json({ success: true, game });
   } catch (error) {
     console.error('Error updating game:', error);
     res.status(500).json({ error: 'Failed to update game' });
@@ -493,12 +508,20 @@ app.put('/api/games/:gameId', (req, res) => {
 });
 
 // Join a garbage war
-app.post('/api/games/:gameId/join', (req, res) => {
+app.post('/api/games/:gameId/join', async (req, res) => {
   try {
     const { gameId } = req.params;
     const { playerAddress, playerBDeposit, playerBTrash } = req.body;
     
-    const game = games.get(gameId);
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      game = await Game.findOne({ id: gameId });
+    } else {
+      // Use in-memory storage
+      game = games.get(gameId);
+    }
     
     if (!game) {
       return res.status(404).json({ 
@@ -529,23 +552,44 @@ app.post('/api/games/:gameId/join', (req, res) => {
     }
     
     // Update game with second player
-    game.playerB = playerAddress;
-    game.playerBDeposit = playerBDeposit;
-    game.playerBTrash = playerBTrash || []; // Trash will be placed separately
-    game.updatedAt = Date.now();
-    
-    // If both players have trash, start the war
-    if (playerBTrash && validateTrashPlacement(playerBTrash, game.gameMode || 'standard')) {
-      game.status = 'playing';
+    if (dbConnected) {
+      // Update MongoDB document
+      game.playerB = {
+        publicKey: playerAddress,
+        board: createEmptyBoard(game.gameMode || 'standard'),
+        trash: playerBTrash || [],
+        deposit: playerBDeposit
+      };
+      game.updatedAt = Date.now();
+      
+      // If both players have trash, start the war
+      if (playerBTrash && validateTrashPlacement(playerBTrash, game.gameMode || 'standard')) {
+        game.status = 'playing';
+      } else {
+        game.status = 'setup'; // Waiting for Player B to place trash
+      }
+      
+      await game.save();
     } else {
-      game.status = 'setup'; // Waiting for Player B to place trash
+      // Update in-memory storage
+      game.playerB = playerAddress;
+      game.playerBDeposit = playerBDeposit;
+      game.playerBTrash = playerBTrash || []; // Trash will be placed separately
+      game.updatedAt = Date.now();
+      
+      // If both players have trash, start the war
+      if (playerBTrash && validateTrashPlacement(playerBTrash, game.gameMode || 'standard')) {
+        game.status = 'playing';
+      } else {
+        game.status = 'setup'; // Waiting for Player B to place trash
+      }
+      
+      // Track games by player
+      if (!gamesByPlayer.has(playerAddress)) {
+        gamesByPlayer.set(playerAddress, new Set());
+      }
+      gamesByPlayer.get(playerAddress).add(gameId);
     }
-    
-    // Track games by player
-    if (!gamesByPlayer.has(playerAddress)) {
-      gamesByPlayer.set(playerAddress, new Set());
-    }
-    gamesByPlayer.get(playerAddress).add(gameId);
     
     console.log(`👥 Player ${playerAddress} joined garbage war ${gameId}`);
     
@@ -619,12 +663,20 @@ app.get('/api/games/public', async (req, res) => {
 });
 
 // Update trash placement for Player B
-app.post('/api/games/:gameId/ships', (req, res) => {
+app.post('/api/games/:gameId/ships', async (req, res) => {
   try {
     const { gameId } = req.params;
     const { playerAddress, ships } = req.body;
     
-    const game = games.get(gameId);
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      game = await Game.findOne({ id: gameId });
+    } else {
+      // Use in-memory storage
+      game = games.get(gameId);
+    }
     
     if (!game) {
       return res.status(404).json({ 
@@ -633,7 +685,10 @@ app.post('/api/games/:gameId/ships', (req, res) => {
       });
     }
     
-    if (game.playerB !== playerAddress) {
+    // Check if player is Player B (handle both storage types)
+    const playerBKey = dbConnected ? game.playerB?.publicKey : game.playerB;
+    
+    if (playerBKey !== playerAddress) {
       return res.status(400).json({ 
         success: false, 
         error: 'Only Player B can set trash for this garbage war' 
@@ -651,9 +706,17 @@ app.post('/api/games/:gameId/ships', (req, res) => {
       });
     }
     
-    game.playerBTrash = ships;
-    game.status = 'playing';
-    game.updatedAt = Date.now();
+    // Update trash placement
+    if (dbConnected) {
+      game.playerB.trash = ships;
+      game.status = 'playing';
+      game.updatedAt = Date.now();
+      await game.save();
+    } else {
+      game.playerBTrash = ships;
+      game.status = 'playing';
+      game.updatedAt = Date.now();
+    }
     
     console.log(`🗑️ Player B placed trash in garbage war ${gameId}`);
     
@@ -673,12 +736,20 @@ app.post('/api/games/:gameId/ships', (req, res) => {
 });
 
 // Make a move
-app.post('/api/games/:gameId/move', (req, res) => {
+app.post('/api/games/:gameId/move', async (req, res) => {
   try {
     const { gameId } = req.params;
     const { playerAddress, row, col } = req.body;
     
-    const game = games.get(gameId);
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      game = await Game.findOne({ id: gameId });
+    } else {
+      // Use in-memory storage
+      game = games.get(gameId);
+    }
     
     if (!game) {
       return res.status(404).json({ 
@@ -706,6 +777,11 @@ app.post('/api/games/:gameId/move', (req, res) => {
     
     // Make the move
     const result = makeMove(game, playerAddress, row, col);
+    
+    // Save game state if using MongoDB
+    if (dbConnected && result) {
+      await game.save();
+    }
     
     console.log(`💥 ${playerAddress} attacked (${row},${col}) in garbage war ${gameId} - ${result.hit ? 'TRASH HIT' : 'MISSED GARBAGE'}`);
     
@@ -757,12 +833,20 @@ app.get('/api/players/:playerAddress/games', (req, res) => {
 });
 
 // Abandon garbage war (for cleanup)
-app.post('/api/games/:gameId/abandon', (req, res) => {
+app.post('/api/games/:gameId/abandon', async (req, res) => {
   try {
     const { gameId } = req.params;
     const { playerAddress, reason } = req.body;
     
-    const game = games.get(gameId);
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      game = await Game.findOne({ id: gameId });
+    } else {
+      // Use in-memory storage
+      game = games.get(gameId);
+    }
     
     if (!game) {
       return res.status(404).json({ 
@@ -771,7 +855,11 @@ app.post('/api/games/:gameId/abandon', (req, res) => {
       });
     }
     
-    if (game.playerA !== playerAddress && game.playerB !== playerAddress) {
+    // Check if player is in this game (handle both storage types)
+    const playerAKey = dbConnected ? game.playerA?.publicKey : game.playerA;
+    const playerBKey = dbConnected ? game.playerB?.publicKey : game.playerB;
+    
+    if (playerAKey !== playerAddress && playerBKey !== playerAddress) {
       return res.status(400).json({ 
         success: false, 
         error: 'You are not a player in this garbage war' 
@@ -781,6 +869,10 @@ app.post('/api/games/:gameId/abandon', (req, res) => {
     game.status = 'abandoned';
     game.abandonReason = reason || 'Player abandoned';
     game.updatedAt = Date.now();
+    
+    if (dbConnected) {
+      await game.save();
+    }
     
     console.log(`🏃 Garbage war ${gameId} abandoned by ${playerAddress}: ${game.abandonReason}`);
     
@@ -800,12 +892,20 @@ app.post('/api/games/:gameId/abandon', (req, res) => {
 });
 
 // Forfeit garbage war (opponent wins)
-app.post('/api/games/:gameId/forfeit', (req, res) => {
+app.post('/api/games/:gameId/forfeit', async (req, res) => {
   try {
     const { gameId } = req.params;
     const { playerAddress, winner, reason } = req.body;
     
-    const game = games.get(gameId);
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      game = await Game.findOne({ id: gameId });
+    } else {
+      // Use in-memory storage
+      game = games.get(gameId);
+    }
     
     if (!game) {
       return res.status(404).json({ 
@@ -814,7 +914,11 @@ app.post('/api/games/:gameId/forfeit', (req, res) => {
       });
     }
     
-    if (game.playerA !== playerAddress && game.playerB !== playerAddress) {
+    // Check if player is in this game (handle both storage types)
+    const playerAKey = dbConnected ? game.playerA?.publicKey : game.playerA;
+    const playerBKey = dbConnected ? game.playerB?.publicKey : game.playerB;
+    
+    if (playerAKey !== playerAddress && playerBKey !== playerAddress) {
       return res.status(400).json({ 
         success: false, 
         error: 'You are not a player in this garbage war' 
@@ -826,6 +930,10 @@ app.post('/api/games/:gameId/forfeit', (req, res) => {
     game.winner = winner;
     game.abandonReason = reason || 'Player forfeited';
     game.updatedAt = Date.now();
+    
+    if (dbConnected) {
+      await game.save();
+    }
     
     console.log(`🏳️ Garbage war ${gameId} forfeited by ${playerAddress} - Winner: ${winner}`);
     
@@ -845,12 +953,20 @@ app.post('/api/games/:gameId/forfeit', (req, res) => {
 });
 
 // Track payout status
-app.post('/api/games/:gameId/payout', (req, res) => {
+app.post('/api/games/:gameId/payout', async (req, res) => {
   try {
     const { gameId } = req.params;
     const { payoutType, winner, processed } = req.body;
     
-    const game = games.get(gameId);
+    let game;
+    
+    if (dbConnected) {
+      // Use MongoDB
+      game = await Game.findOne({ id: gameId });
+    } else {
+      // Use in-memory storage
+      game = games.get(gameId);
+    }
     
     if (!game) {
       return res.status(404).json({ 
@@ -865,6 +981,10 @@ app.post('/api/games/:gameId/payout', (req, res) => {
     game.payoutWinner = winner;
     game.payoutTimestamp = Date.now();
     game.updatedAt = Date.now();
+    
+    if (dbConnected) {
+      await game.save();
+    }
     
     console.log(`💰 Payout processed for garbage war ${gameId}: ${payoutType} to ${winner || 'players'}`);
     
